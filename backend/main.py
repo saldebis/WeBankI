@@ -96,7 +96,7 @@ def buckets_of(c, uid):
 
 def week_spent(c, uid):
     monday = (dt.date.today() - dt.timedelta(days=dt.date.today().weekday())).isoformat()
-    return c.execute("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE user_id=? AND category='weekly' "
+    return c.execute("SELECT COALESCE(SUM(amount),0) s FROM transactions WHERE user_id=? "
                      "AND created_at>=?", (uid, monday)).fetchone()["s"]
 
 def due_soon(buckets, days_ahead):
@@ -239,3 +239,210 @@ def report(uid: int = Depends(current_uid)):
                          "GROUP BY category", (uid, since)).fetchall()
         return {"since": since, "by_category": {r["category"]: r["t"] for r in rows},
                 "total": sum(r["t"] for r in rows), "week_spent": week_spent(c, uid)}
+
+# ---------- new routes ----------
+class WeeklyLimitIn(BaseModel):
+    weekly_limit: int = Field(..., ge=0, description="cents")
+
+@app.patch("/me/weekly-limit")
+def set_weekly_limit(b: WeeklyLimitIn, uid: int = Depends(current_uid)):
+    """Update the user's weekly spending limit (cents)."""
+    with db() as c:
+        c.execute("UPDATE users SET weekly_limit=? WHERE id=?", (b.weekly_limit, uid))
+    return {"weekly_limit": b.weekly_limit}
+
+@app.get("/me/analyse-bills")
+def analyse_bills(uid: int = Depends(current_uid)):
+    """For every bill/rent/tuition bucket: what is due, what is funded, what is still needed."""
+    with db() as c:
+        u = get_user(c, uid)
+        buckets = buckets_of(c, uid)
+        safe = u["balance"] - sum(b["saved"] for b in buckets)
+        due14 = due_soon(buckets, 14)
+        result = []
+        for b in [x for x in buckets if x["kind"] != "savings"]:
+            still = max(b["amount_due"] - b["saved"], 0)
+            result.append({
+                "id": b["id"], "name": b["name"], "kind": b["kind"],
+                "amount_due": b["amount_due"], "saved": b["saved"],
+                "still_needed": still, "due_date": b["due_date"],
+                "funded": still == 0,
+                "days_left": (dt.date.fromisoformat(b["due_date"]) - dt.date.today()).days if b["due_date"] else None,
+            })
+        total_still_needed = sum(r["still_needed"] for r in result)
+        return {
+            "bills": result,
+            "total_still_needed": total_still_needed,
+            "safe_to_spend": safe,
+            "can_cover_all": safe >= total_still_needed,
+        }
+
+class PlanSavingsIn(BaseModel):
+    goal_bucket_id: int
+    months: int = Field(..., gt=0)
+
+@app.post("/me/plan-savings")
+def plan_savings(b: PlanSavingsIn, uid: int = Depends(current_uid)):
+    """How much per month to reach a savings goal, and whether it fits in safe_to_spend."""
+    with db() as c:
+        u = get_user(c, uid)
+        bucket = c.execute("SELECT * FROM buckets WHERE id=? AND user_id=? AND kind='savings'",
+                           (b.goal_bucket_id, uid)).fetchone()
+        if not bucket:
+            raise HTTPException(404, "Savings bucket not found")
+        buckets = buckets_of(c, uid)
+        safe = u["balance"] - sum(bk["saved"] for bk in buckets)
+        remaining = max(bucket["amount_due"] - bucket["saved"], 0)
+        monthly = (remaining + b.months - 1) // b.months  # ceiling integer division (cents)
+        return {
+            "goal": bucket["name"], "goal_amount": bucket["amount_due"],
+            "already_saved": bucket["saved"], "remaining": remaining,
+            "months": b.months, "monthly_needed": monthly,
+            "fits_in_safe_to_spend": monthly <= safe,
+        }
+
+# ---------- WEWE LLM chat ----------
+import collections, time as _time
+
+# Simple in-memory rate limiter: max 20 calls per user per hour
+_rate: dict[int, collections.deque] = {}
+_RATE_MAX = 20
+_RATE_WINDOW = 3600  # seconds
+
+def _check_rate(uid: int):
+    now = _time.monotonic()
+    q = _rate.setdefault(uid, collections.deque())
+    while q and now - q[0] > _RATE_WINDOW:
+        q.popleft()
+    if len(q) >= _RATE_MAX:
+        raise HTTPException(429, "Rate limit: max 20 WEWE messages per hour")
+    q.append(now)
+
+def _financial_snapshot(uid: int) -> str:
+    """Build a dollar-formatted snapshot for the LLM. Never includes credentials."""
+    with db() as c:
+        u = get_user(c, uid)
+        buckets = buckets_of(c, uid)
+        spent = week_spent(c, uid)
+        safe = u["balance"] - sum(b["saved"] for b in buckets)
+        weekly_left = (u["weekly_limit"] - spent) if u["weekly_limit"] else None
+        since = dt.date.today().replace(day=1).isoformat()
+        rows = c.execute("SELECT category, SUM(amount) t FROM transactions WHERE user_id=? AND created_at>=? "
+                         "GROUP BY category", (uid, since)).fetchall()
+        reminders = due_soon(buckets, 14)
+
+    lines = [
+        f"User: {u['name']}",
+        f"Balance: ${u['balance']/100:.2f}",
+        f"Monthly salary: ${u['salary']/100:.2f}",
+        f"Safe to spend (balance minus reserved): ${safe/100:.2f}",
+        f"Weekly spending limit: {'${:.2f}'.format(u['weekly_limit']/100) if u['weekly_limit'] else 'not set'}",
+        f"Spent this week: ${spent/100:.2f}",
+        f"Weekly budget left: {'${:.2f}'.format(weekly_left/100) if weekly_left is not None else 'no limit set'}",
+    ]
+    if buckets:
+        lines.append("Buckets:")
+        for b in buckets:
+            still = max(b["amount_due"] - b["saved"], 0)
+            lines.append(f"  [{b['kind']}] {b['name']}: goal ${b['amount_due']/100:.2f}, saved ${b['saved']/100:.2f}, still needed ${still/100:.2f}"
+                         + (f", due {b['due_date']}" if b["due_date"] else ""))
+    if reminders:
+        lines.append("Upcoming bills (due within 14 days, not fully funded):")
+        for r in reminders:
+            lines.append(f"  {r['name']}: ${r['still_needed']/100:.2f} still needed, due in {r['days_left']} days")
+    if rows:
+        lines.append("This month's spending by category:")
+        for row in rows:
+            lines.append(f"  {row['category']}: ${row['t']/100:.2f}")
+    return "\n".join(lines)
+
+_SYSTEM_PROMPT = """You are WEWE, a friendly green robot money assistant for the WEBANKI app.
+Rules:
+- Only use numbers that appear in the financial snapshot or tool results. Never invent numbers or do arithmetic yourself.
+- If data is missing or unclear, say so and ask the user one short question.
+- Keep answers under 80 words.
+- Answer in the user's language (English or Arabic).
+- Stay strictly on personal budgeting topics. Politely decline anything else.
+- This is a simulated app — never claim to move real money or provide professional financial advice.
+- Be warm, concise, and helpful. Sign off responses with a brief encouragement."""
+
+def _rule_based_reply(uid: int, text: str) -> str:
+    """Fallback when LLM is unavailable."""
+    q = text.lower()
+    with db() as c:
+        u = get_user(c, uid)
+        buckets = buckets_of(c, uid)
+        spent = week_spent(c, uid)
+        safe = u["balance"] - sum(b["saved"] for b in buckets)
+        weekly_left = (u["weekly_limit"] - spent) if u["weekly_limit"] else None
+    if "afford" in q or "buy" in q or "can i" in q:
+        m = __import__("re").search(r"(\d+(?:\.\d{1,2})?)", q)
+        if m:
+            amt = round(float(m.group(1)) * 100)
+            if amt > safe:
+                return f"That would dip into your reserved money. Your safe-to-spend is ${safe/100:.2f}."
+            if weekly_left is not None and amt > weekly_left:
+                return f"You can pay for it, but it goes over your weekly limit. You have ${weekly_left/100:.2f} left this week."
+            return f"Yes, you can afford it! Your safe-to-spend is ${safe/100:.2f}."
+    if "bill" in q:
+        soon = due_soon(buckets, 14)
+        if soon:
+            s = soon[0]
+            return f"{s['name']} is due in {s['days_left']} days and still needs ${s['still_needed']/100:.2f}."
+        return "No unfunded bills due soon. You're all set!"
+    if "saving" in q:
+        sv = next((b for b in buckets if b["kind"] == "savings"), None)
+        if sv:
+            return f"You've saved ${sv['saved']/100:.2f} of ${sv['amount_due']/100:.2f} for {sv['name']}. Keep going!"
+        return "You have no savings goal set yet."
+    if "limit" in q:
+        return (f"Your weekly limit is ${u['weekly_limit']/100:.2f} and you have "
+                f"${weekly_left/100:.2f} left." if u["weekly_limit"] and weekly_left is not None
+                else "You have no weekly limit set yet.")
+    return wewe_tip(buckets, safe, weekly_left)
+
+class ChatIn(BaseModel):
+    message: str
+    history: Optional[list] = Field(default_factory=list)
+
+@app.post("/me/wewe/chat")
+def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
+    """LLM-powered WEWE chat. Falls back to rule-based reply if LLM is unavailable."""
+    _check_rate(uid)
+    snapshot = _financial_snapshot(uid)
+
+    provider = os.environ.get("LLM_PROVIDER", "openai").lower()
+    api_key = os.environ.get("LLM_API_KEY", "")
+    model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+    base_url = os.environ.get("LLM_BASE_URL", "")
+
+    if not api_key:
+        return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
+
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT + "\n\nCurrent financial snapshot:\n" + snapshot},
+    ]
+    for h in (b.history or []):
+        if isinstance(h, dict) and h.get("role") in ("user", "assistant"):
+            messages.append({"role": h["role"], "content": str(h.get("content", ""))})
+    messages.append({"role": "user", "content": b.message})
+
+    try:
+        import urllib.request, json as _json
+        if provider == "watsonx":
+            # IBM watsonx.ai chat completions endpoint (OpenAI-compatible)
+            url = base_url or "https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2024-05-13"
+        else:
+            url = (base_url.rstrip("/") + "/chat/completions") if base_url else "https://api.openai.com/v1/chat/completions"
+
+        payload = _json.dumps({"model": model, "messages": messages, "max_tokens": 200, "temperature": 0.4}).encode()
+        req = urllib.request.Request(url, data=payload,
+                                     headers={"Content-Type": "application/json",
+                                              "Authorization": f"Bearer {api_key}"},
+                                     method="POST")
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = _json.loads(resp.read())
+        reply = data["choices"][0]["message"]["content"].strip()
+        return {"reply": reply, "source": "llm"}
+    except Exception:
+        return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}

@@ -247,7 +247,7 @@ async function load(){
   const by=k=>D.buckets.filter(b=>b.kind===k);
   const agg=k=>{const l=by(k);return{due:l.reduce((s,b)=>s+b.amount_due,0),saved:l.reduce((s,b)=>s+b.saved,0),date:l.map(b=>b.due_date).filter(Boolean).sort()[0]}};
   for(const [id,k] of [['k-bills','bills'],['k-rent','rent'],['k-tuition','tuition']]){const a=agg(k);setCard(id,a.due,(k==='tuition'?'Next term ':'Due ')+fd(a.date),a.due?a.saved/a.due*100:0)}
-  const w=D.weekly;setCard('k-week',w.left??0,'Left this week',w.limit?(w.left/w.limit)*100:0);
+  const w=D.weekly;const wLeft=w.left!=null?Math.max(w.left,0):0;setCard('k-week',wLeft,'Left this week',w.limit?Math.min(Math.max(wLeft/w.limit*100,0),100):0);
   const sv=by('savings')[0];
   if(sv){const p=sv.amount_due?Math.round(sv.saved/sv.amount_due*100):0;$('#goalT').textContent='Savings goal: '+sv.name;$('#goalP').textContent=p+'%';$('#goalF').dataset.w=p;$('#goalS').textContent=usd(sv.saved)+' saved of '+usd(sv.amount_due)}
   const parts=[['Rent',agg('rent').saved],['Bills',agg('bills').saved],['Tuition',agg('tuition').saved],['Savings',agg('savings').saved],['Free to spend',Math.max(D.safe_to_spend,0)]];
@@ -273,24 +273,49 @@ document.querySelectorAll('.tg').forEach(t=>t.onclick=()=>t.classList.toggle('on
 $('#mv').onclick=async()=>{const b=nextDue();if(!b)return;try{const r=await post(`/me/buckets/${b.id}/pay`);toast(`Paid ${r.paid}: ${usd(r.amount)} ✓`);await load()}catch(e){toast(e.message)}};
 $('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary ${usd(r.salary_added)} added and split ✓`);await load()}catch(e){toast(e.message)}};
 
-/* ===== WEWE chat: maps questions to her endpoints ===== */
+/* ===== WEWE chat ===== */
+// Keep a short history for the LLM (last 6 turns = 3 pairs)
+let _chatHistory=[];
+const MAX_HIST=6;
+
 async function askWewe(text){
   const q=text.toLowerCase();
-  if(/\b(plan|list|show|what|all)\b/.test(q)&&/bill/.test(q)){const d=await api('/me/dashboard'),l=d.buckets.filter(b=>b.kind!=='savings');
-    return l.length?l.map(b=>`${b.name}: ${usd(b.saved)} of ${usd(b.amount_due)} set aside, due ${fd(b.due_date)}`).join('. ')+'.':'You have no bills yet.'}
-  if(/bill|remind/.test(q)){const r=(await api('/me/reminders')).reminders;
-    return r.length?r.map(x=>`${x.name} is due in ${x.days_left} days and still needs ${usd(x.still_needed)}`).join('. ')+'.':'No bills are due in the next 3 days. You’re all set.'}
-  if(/report|spending/.test(q)){const r=await api('/me/report'),k=Object.entries(r.by_category);
-    return k.length?`This month you spent ${usd(r.total)}: `+k.map(([c,v])=>`${c} ${usd(v)}`).join(', ')+'.':'No spending yet this month.'}
-  if(/split|salary|payday/.test(q)){const r=await post('/me/payday');await load();
-    return `Added ${usd(r.salary_added)}. I set aside `+r.plan.map(p=>`${usd(p.set_aside)} for ${p.bucket}`).join(', ')+'.'}
-  if(/limit/.test(q)){const d=await api('/me/dashboard'),w=d.weekly;return w.limit?`Your weekly limit is ${usd(w.limit)} and you have ${usd(w.left)} left.`:'You have no weekly limit set yet.'}
-  if(/saving/.test(q)){const d=await api('/me/dashboard'),s=d.buckets.find(b=>b.kind==='savings');return s?`You’ve saved ${usd(s.saved)} of ${usd(s.amount_due)} for ${s.name}. Keep going!`:'You have no savings goal yet.'}
-  if(/afford|buy|can i/.test(q)){const m=q.match(/(\d+(?:\.\d{1,2})?)/);
-    if(!m)return 'Tell me the price, like “Can I afford $60?”';
-    return (await api('/me/afford?amount='+Math.round(m[1]*100))).message}
-  return (await api('/me/dashboard')).wewe_tip;
+  // --- special chips that call dedicated routes ---
+  if(/^set weekly limit$/i.test(text.trim())){
+    const raw=prompt('Enter your new weekly limit in dollars (e.g. 150):');
+    if(!raw)return 'No problem, your weekly limit is unchanged.';
+    const dollars=parseFloat(raw);
+    if(!(dollars>=0))return 'That doesn\'t look like a valid amount. Try again.';
+    const cents=Math.round(dollars*100);
+    await api('/me/weekly-limit',{method:'PATCH',body:JSON.stringify({weekly_limit:cents})});
+    await load();
+    return `Done! Your weekly limit is now ${usd(cents)}.`;
+  }
+  if(/^analyse my bills$/i.test(text.trim())){
+    const d=await api('/me/analyse-bills');
+    if(!d.bills.length)return 'You have no bills set up yet.';
+    const lines=d.bills.map(b=>`${b.name}: ${usd(b.amount_due)} due${b.due_date?' on '+fd(b.due_date):''} — ${b.funded?'fully funded ✓':'still needs '+usd(b.still_needed)}`);
+    const footer=d.can_cover_all?'Your safe-to-spend covers everything. ':`You still need ${usd(d.total_still_needed)} more. `;
+    return lines.join('. ')+'. '+footer;
+  }
+  if(/^plan my savings$/i.test(text.trim())){
+    const d=await api('/me/dashboard');
+    const sv=d.buckets.find(b=>b.kind==='savings');
+    if(!sv)return 'You have no savings goal yet. Add one in the buckets section.';
+    const raw=prompt('How many months do you want to reach your goal in?');
+    if(!raw)return 'No problem, just let me know when you\'re ready.';
+    const months=parseInt(raw);
+    if(!(months>0))return 'Please enter a whole number of months.';
+    const r=await post('/me/plan-savings',{goal_bucket_id:sv.id,months});
+    return `To reach your ${r.goal} goal of ${usd(r.goal_amount)} in ${r.months} month${r.months===1?'':'s'}, `+
+      `you need to save ${usd(r.monthly_needed)}/month. `+
+      (r.fits_in_safe_to_spend?'That fits within your safe-to-spend budget. Great plan!':'That's more than your current safe-to-spend — consider a longer timeline.');
+  }
+  // --- everything else goes to the LLM chat route ---
+  const result=await post('/me/wewe/chat',{message:text,history:_chatHistory});
+  return result.reply||'Sorry, I couldn\'t get a response.';
 }
+
 const msgs=$('#msgs');
 function bubble(cls,html=''){const d=document.createElement('div');d.className='m '+cls;d.innerHTML=html;msgs.appendChild(d);d.scrollIntoView({block:'center',behavior:'smooth'});return d}
 async function send(text){
@@ -298,7 +323,15 @@ async function send(text){
   $('#inp').value='';$('#chips').style.display='none';
   bubble('u').textContent=text;
   const w=bubble('w','<div class="dots"><i></i><i></i><i></i></div>');
-  let reply;try{reply=await askWewe(text)}catch(e){reply='I couldn’t reach the server. Is the backend running?'}
+  let reply;
+  try{
+    reply=await askWewe(text);
+    // update history for LLM context (keep last MAX_HIST messages)
+    _chatHistory.push({role:'user',content:text},{role:'assistant',content:reply});
+    if(_chatHistory.length>MAX_HIST)_chatHistory=_chatHistory.slice(-MAX_HIST);
+  }catch(e){
+    reply=e.message&&e.message.length<120?e.message:'I couldn\'t reach the server. Please try again in a moment.';
+  }
   w.textContent='';
   for(const ch of reply){w.textContent+=ch;await new Promise(r=>setTimeout(r,14))}
   w.scrollIntoView({block:'center'});
