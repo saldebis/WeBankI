@@ -8,7 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field
 
-DB = os.environ.get("WEBANKI_DB", "webanki.db")
+# Vercel's serverless filesystem is read-only except for /tmp.
+# Set WEBANKI_DB env var in the Vercel dashboard to a persistent store path,
+# or leave it as /tmp/webanki.db for ephemeral (resets on cold start).
+DB = os.environ.get("WEBANKI_DB", "/tmp/webanki.db")
 SECRET = os.environ.get("WEBANKI_SECRET", "dev-secret-change-me")  # set a real one when deployed
 app = FastAPI(title="WEBANKI API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

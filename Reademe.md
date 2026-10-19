@@ -1,5 +1,43 @@
 # WEBANKI
 
+## Deploy to Vercel
+
+### One-time setup
+1. Install the Vercel CLI: `npm i -g vercel`
+2. Log in: `vercel login`
+
+### Deploy
+```bash
+cd backend
+vercel
+```
+On the first deploy Vercel will ask a few questions:
+- **Set up and deploy?** → Yes
+- **Which scope?** → your account
+- **Link to existing project?** → No (create new)
+- **Project name** → `webanki` (or anything you like)
+- **Directory** → `.` (you are already inside `backend/`)
+- **Override settings?** → No
+
+After it finishes, Vercel prints your URL, e.g. `https://webanki-xyz.vercel.app`.
+
+### Environment variables (set in the Vercel dashboard)
+| Variable | Purpose | Example |
+|---|---|---|
+| `WEBANKI_SECRET` | JWT signing secret — **change this!** | `some-long-random-string` |
+| `WEBANKI_DB` | SQLite path (optional — see note below) | `/tmp/webanki.db` |
+
+> **SQLite on Vercel is ephemeral.** `/tmp` is writable but resets on every cold start, so registered users and data are lost between deploys/restarts. For a production-grade persistent store, swap SQLite for a hosted DB (e.g. Vercel Postgres, PlanetScale, or Turso) and update `main.py` accordingly.
+
+### Subsequent deploys
+```bash
+cd backend
+vercel --prod
+```
+
+---
+
+
 Budgeting app with WEWE, a green robot that helps you plan your money.
 Built for the Shenzhen FinTech Competition.
 
