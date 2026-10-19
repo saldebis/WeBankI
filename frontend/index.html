@@ -279,12 +279,14 @@ async function api(path,opt={}){
 const post=(p,b)=>api(p,{method:'POST',body:b?JSON.stringify(b):undefined});
 async function login(){
   try{TOKEN=(await post('/auth/login',DEMO)).token}
-  catch(e){ // first run: create the demo user and seed buckets
-    TOKEN=(await post('/auth/register',{name:'Alex',...DEMO,balance:100000,salary:320000,weekly_limit:20000,savings_pct:20})).token;
-    await post('/me/buckets',{kind:'rent',name:'Rent',amount_due:95000,due_date:day(5)});
-    await post('/me/buckets',{kind:'bills',name:'Bills',amount_due:34000,due_date:day(2)});
-    await post('/me/buckets',{kind:'tuition',name:'Tuition',amount_due:120000,due_date:day(90)});
-    await post('/me/buckets',{kind:'savings',name:'New laptop',amount_due:150000});
+  catch(e){ // first run or cold-start DB reset: recreate the demo user and seed buckets
+    try{
+      TOKEN=(await post('/auth/register',{name:'Alex',...DEMO,balance:100000,salary:320000,weekly_limit:20000,savings_pct:20})).token;
+      await post('/me/buckets',{kind:'rent',name:'Rent',amount_due:95000,due_date:day(5)});
+      await post('/me/buckets',{kind:'bills',name:'Bills',amount_due:34000,due_date:day(2)});
+      await post('/me/buckets',{kind:'tuition',name:'Tuition',amount_due:120000,due_date:day(90)});
+      await post('/me/buckets',{kind:'savings',name:'New laptop',amount_due:150000});
+    }catch(e2){throw new Error('Backend unreachable: '+e2.message)}
   }}
 
 /* ===== Render ===== */
@@ -391,7 +393,16 @@ $('#exGo').onclick=async()=>{const v=parseFloat($('#exA').value);if(!(v>0))retur
     toast(r.round_up_saved?`Added. WEWE saved ${usd(r.round_up_saved)} from the round-up ✓`:'Expense added ✓');
     if(r.warning)setTimeout(()=>toast(r.warning),2800);
     $('#exA').value='';$('#exN').value='';await load();await loadReport()}catch(e){toast(e.message)}};
-(async()=>{try{await login();await load()}catch(e){toast('Can\'t reach the backend. Start it, then refresh.')}})();
+(async()=>{
+  try{await login();await load()}
+  catch(e){
+    // Show a persistent error banner instead of a disappearing toast
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;inset:0;z-index:99;background:rgba(3,23,15,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#8CF3BE;font-size:16px;padding:24px;text-align:center';
+    banner.innerHTML=`<div style="font-size:40px">⚠️</div><div><b>Can't reach the backend</b><br><span style="font-size:14px;color:#4C6E5F">${e.message}</span></div><button onclick="location.reload()" style="background:linear-gradient(90deg,#00E676,#5CF2A8);color:#03170F;border:0;padding:12px 28px;border-radius:99px;font-size:16px;font-weight:700;cursor:pointer">Retry</button>`;
+    document.body.appendChild(banner);
+  }
+})();
 
 /* ===== Modals ===== */
 function openModal(id){const m=$('#'+id);m.style.display='flex'}
