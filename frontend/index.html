@@ -324,6 +324,7 @@ $('#mv').onclick=async()=>{const b=nextDue();if(!b)return;try{const r=await post
 $('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary ${usd(r.salary_added)} added and split ✓`);await load()}catch(e){toast(e.message)}};
 
 /* ===== WEWE chat ===== */
+let _chatHistory=[];
 async function askWewe(text){
   const q=text.toLowerCase();
   if(/\b(plan|list|show|what|all)\b/.test(q)&&/bill/.test(q)){const d=await api('/me/dashboard'),l=d.buckets.filter(b=>b.kind!=='savings');
@@ -343,8 +344,8 @@ async function askWewe(text){
     if(m[2].toLowerCase()==='k')amt*=1000;
     if(m[2].toLowerCase()==='m')amt*=1000000;
     return (await api('/me/afford?amount='+Math.round(amt*100))).message}
-  const d=await api('/me/dashboard');
-  return `You have $${(d.safe_to_spend/100).toFixed(2)} safe to spend. Ask me "Can I afford $X?", "Show my bills", "Savings", or "Spending report".`;
+  const r=await post('/me/wewe/chat',{message:text,history:_chatHistory});
+  return r.reply||'Sorry, I couldn\'t get a response right now.';
 }
 
 const msgs=$('#msgs');
