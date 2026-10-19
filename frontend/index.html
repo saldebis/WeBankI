@@ -333,7 +333,7 @@ async function askWewe(text){
     return r.length?r.map(x=>`${x.name} is due in ${x.days_left} days and still needs ${usd(x.still_needed)}`).join('. ')+'.':'No bills are due in the next 3 days. You\'re all set.'}
   if(/report|spending/.test(q)){const r=await api('/me/report'),k=Object.entries(r.by_category);
     return k.length?`This month you spent ${usd(r.total)}: `+k.map(([c,v])=>`${c} ${usd(v)}`).join(', ')+'.':'No spending yet this month.'}
-  if(/split|salary|payday/.test(q)){const r=await post('/me/payday');await load();
+  if(/\b(split my salary|payday|add salary)\b/.test(q)){const r=await post('/me/payday');await load();
     return `Added ${usd(r.salary_added)}. I set aside `+r.plan.map(p=>`${usd(p.set_aside)} for ${p.bucket}`).join(', ')+'.'}
   if(/limit/.test(q)){const d=await api('/me/dashboard'),w=d.weekly;return w.limit?`Your weekly limit is ${usd(w.limit)} and you have ${usd(w.left)} left.`:'You have no weekly limit set yet.'}
   if(/saving|save for|put aside/.test(q)){const d=await api('/me/dashboard'),s=d.buckets.find(b=>b.kind==='savings');return s?`You've saved ${usd(s.saved)} of ${usd(s.amount_due)} for ${s.name}. Keep going!`:'You have no savings goal yet.'}
@@ -355,7 +355,12 @@ async function send(text){
   $('#inp').value='';$('#chips').style.display='none';
   bubble('u').textContent=text;
   const w=bubble('w','<div class="dots"><i></i><i></i><i></i></div>');
-  let reply;try{reply=await askWewe(text)}catch(e){reply='I couldn\'t reach the server. Please try again.'}
+  let reply;
+  try{reply=await askWewe(text)}
+  catch(e){reply='I couldn\'t reach the server. Please try again.'}
+  // update rolling history for LLM context (keep last 6 messages = 3 pairs)
+  _chatHistory.push({role:'user',content:text},{role:'assistant',content:reply});
+  if(_chatHistory.length>6)_chatHistory=_chatHistory.slice(-6);
   w.textContent='';
   for(const ch of reply){w.textContent+=ch;await new Promise(r=>setTimeout(r,14))}
   w.scrollIntoView({block:'center'});

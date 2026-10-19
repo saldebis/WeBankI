@@ -489,33 +489,56 @@ def _financial_snapshot(uid: int) -> str:
 
 _SYSTEM_PROMPT = """You are WEWE, a friendly green robot money assistant for the WEBANKI app.
 Rules:
-- Only use numbers that appear in the financial snapshot or tool results. Never invent numbers or do arithmetic yourself.
-- If data is missing or unclear, say so and ask the user one short question.
+- You have access to the user's real financial snapshot below. Use it to answer financial questions.
+- If the user asks arithmetic (e.g. "4400-500", "what is 8000 minus 99"), compute and answer it directly.
+- If the user asks something ambiguous or unclear (like a single letter), ask them to clarify in a friendly way.
+- If the user asks about their finances, use ONLY the numbers from the financial snapshot — never invent figures.
 - Keep answers under 80 words.
 - Answer in the user's language (English or Arabic).
-- Stay strictly on personal budgeting topics. Politely decline anything else.
+- You can answer general friendly conversation briefly, then guide back to budgeting.
 - This is a simulated app — never claim to move real money or provide professional financial advice.
-- Be warm, concise, and helpful. Sign off responses with a brief encouragement."""
+- Be warm, concise, and helpful."""
 
 def _rule_based_reply(uid: int, text: str) -> str:
-    """Fallback when LLM is unavailable."""
-    q = text.lower()
+    """Fallback when LLM is unavailable. Never returns an unrelated financial warning."""
+    import re as _re
+    q = text.lower().strip()
+
+    # Arithmetic: handle expressions like "4400-500", "8000 minus 99", "what is 120+30"
+    arith = _re.sub(r'\b(plus|add)\b', '+', _re.sub(r'\b(minus|subtract)\b', '-',
+             _re.sub(r'\b(times|multiplied by)\b', '*', _re.sub(r'\b(divided by)\b', '/', q))))
+    m = _re.fullmatch(r'\s*[\d\s\+\-\*\/\.\(\)]+\s*', arith)
+    if m:
+        try:
+            # Safe arithmetic: only digits and operators, no names/functions
+            result = eval(compile(arith.strip(), '<string>', 'eval'),  # noqa: S307
+                          {"__builtins__": {}}, {})
+            return f"{arith.strip()} = {result:g}"
+        except Exception:
+            pass
+
+    # Ambiguous / too short
+    if len(q) <= 2:
+        return "I didn't catch that 😊 Could you tell me more? For example: \"Can I afford $50?\" or \"Show my bills\"."
+
     with db() as c:
         u = get_user(c, uid)
         buckets = buckets_of(c, uid)
         spent = week_spent(c, uid)
         safe = u["balance"] - sum(b["saved"] for b in buckets)
         weekly_left = (u["weekly_limit"] - spent) if u["weekly_limit"] else None
+
     if "afford" in q or "buy" in q or "can i" in q:
-        m = __import__("re").search(r"(\d+(?:\.\d{1,2})?)", q)
-        if m:
-            amt = round(float(m.group(1)) * 100)
+        m2 = _re.search(r"(\d+(?:\.\d{1,2})?)", q)
+        if m2:
+            amt = round(float(m2.group(1)) * 100)
             if amt > safe:
                 return f"That would dip into your reserved money. Your safe-to-spend is ${safe/100:.2f}."
             if weekly_left is not None and amt > weekly_left:
-                return f"You can pay for it, but it goes over your weekly limit. You have ${weekly_left/100:.2f} left this week."
+                return f"You can pay for it, but it goes over your weekly limit. You have ${weekly_left/100:.2f} left."
             return f"Yes, you can afford it! Your safe-to-spend is ${safe/100:.2f}."
-    if "bill" in q:
+        return f"Tell me the price and I'll check! Your safe-to-spend is ${safe/100:.2f}."
+    if "bill" in q or "remind" in q:
         soon = due_soon(buckets, 14)
         if soon:
             s = soon[0]
@@ -526,11 +549,13 @@ def _rule_based_reply(uid: int, text: str) -> str:
         if sv:
             return f"You've saved ${sv['saved']/100:.2f} of ${sv['amount_due']/100:.2f} for {sv['name']}. Keep going!"
         return "You have no savings goal set yet."
-    if "limit" in q:
-        return (f"Your weekly limit is ${u['weekly_limit']/100:.2f} and you have "
-                f"${weekly_left/100:.2f} left." if u["weekly_limit"] and weekly_left is not None
-                else "You have no weekly limit set yet.")
-    return wewe_tip(buckets, safe, weekly_left)
+    if "limit" in q or "weekly" in q:
+        if u["weekly_limit"] and weekly_left is not None:
+            return f"Your weekly limit is ${u['weekly_limit']/100:.2f} and you have ${weekly_left/100:.2f} left."
+        return "You have no weekly limit set yet."
+    # Generic fallback: show safe-to-spend, not a hardcoded warning
+    tip = wewe_tip(buckets, safe, weekly_left)
+    return f"{tip} Ask me anything about your money!"
 
 class ChatIn(BaseModel):
     message: str
