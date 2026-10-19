@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Local database (contains test accounts, never commit it)
+*.db
+
+# Secrets
+.env
+
+# Editor / OS
+.vscode/
+.DS_Store
