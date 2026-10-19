@@ -18,7 +18,7 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100%}
-.app{max-width:430px;margin:0 auto;padding:18px 18px 110px;position:relative}
+.app{max-width:430px;margin:0 auto;padding:18px;position:relative}
 .screen{display:none}.screen.on{display:block;animation:swap .45s cubic-bezier(.2,.8,.2,1)}
 @keyframes swap{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
@@ -83,12 +83,12 @@ h3{font-size:16px;color:var(--muted);font-weight:500;margin:6px 0 10px}
 .tg::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .3s cubic-bezier(.3,1.5,.5,1);box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .tg.on{background:linear-gradient(90deg,var(--g2),var(--g1))}.tg.on::after{transform:translateX(20px)}
 .view{font-weight:700;color:var(--g2);font-size:14px}
-.ask{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom,0px));max-width:430px;margin:0 auto;padding:10px 18px;display:none;gap:10px;background:linear-gradient(transparent,var(--bg) 40%)}
+.ask{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;padding:10px 18px;display:none;gap:10px;background:linear-gradient(transparent,var(--bg) 40%)}
 .ask.on{display:flex}
 .ask input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:14px 18px;outline:none}
 .ask input:focus{border-color:var(--g1);box-shadow:0 0 0 3px rgba(0,230,118,.25)}
 .go{border:0;font:inherit;font-weight:700;color:#03170F;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#5CF2A8,#00E676);cursor:pointer;box-shadow:0 8px 20px -6px rgba(0,230,118,.7)}
-nav{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;display:flex;justify-content:space-around;background:var(--bg);border-top:1px solid var(--line);padding:14px 6px calc(14px + env(safe-area-inset-bottom,0px));z-index:5}
+nav{max-width:430px;margin:0 auto;display:flex;justify-content:space-around;background:var(--bg);border-top:1px solid var(--line);padding:14px 6px;z-index:5}
 nav button{font:inherit;font-size:15px;background:none;border:0;color:var(--muted);cursor:pointer;position:relative;padding:4px 6px}
 nav button.on{color:var(--text);font-weight:700}
 nav button.on::after{content:"";position:absolute;left:25%;right:25%;bottom:-8px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--g2),var(--g1))}
@@ -97,7 +97,7 @@ nav button.on::after{content:"";position:absolute;left:25%;right:25%;bottom:-8px
 body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),transparent 60%),radial-gradient(700px 420px at -5% 110%,rgba(18,183,106,.18),transparent 60%),var(--bg);background-attachment:fixed}
 .cols{display:block}
 @media (min-width:900px){
-  .app{max-width:1080px;padding:30px 32px 120px}
+  .app{max-width:1080px;padding:30px 32px}
   .cols{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:28px;align-items:start}
   .big{font-size:60px}
   nav{max-width:1080px;justify-content:flex-start;gap:34px;padding-left:32px;padding-right:32px}
@@ -111,10 +111,15 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
 .toast.on{transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="toast" id="toast"></div>
 <div class="app">
+
+<nav id="nav">
+  <button class="on" data-s="home">Home</button><button data-s="spend">Spend</button><button data-s="wewe">WEWE</button>
+</nav>
 
 <!-- HOME -->
 <section class="screen on" id="home">
@@ -222,7 +227,8 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
     </div>
     <div id="qrResult" style="display:none;text-align:center;padding:10px 0">
       <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Share this token:</div>
-      <div id="qrTokenOut" style="font-weight:700;font-size:15px;word-break:break-all;background:var(--bg);border-radius:12px;padding:12px"></div>
+      <div id="qrImage" style="display:flex;justify-content:center;margin:16px 0"></div>
+<div id="qrTokenOut" style="font-weight:700;font-size:15px;word-break:break-all;background:var(--bg);border-radius:12px;padding:12px"></div>
     </div>
     <button class="mv" onclick="closeModal('modalQR')" style="width:100%;padding:13px;margin-top:14px;background:var(--line);color:var(--text)">Close</button>
   </div>
@@ -245,9 +251,6 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
 </div>
 
 <form class="ask" id="ask" onsubmit="return false"><input id="inp" placeholder="Ask WEWE anything" autocomplete="off"><button class="go" id="go" type="button">Go</button></form>
-<nav id="nav">
-  <button class="on" data-s="home">Home</button><button data-s="spend">Spend</button><button data-s="wewe">WEWE</button>
-</nav>
 
 <script>
 // Robot mascot
@@ -255,8 +258,9 @@ const botSVG=s=>`<svg class="bot" width="${s}" height="${s}" viewBox="0 0 100 10
 document.querySelectorAll('[data-bot]').forEach(e=>e.innerHTML=botSVG(+e.dataset.bot));
 
 const $=s=>document.querySelector(s);
-const API='https://webanki.vercel.app', DEMO={email:'demo@webanki.app',password:'Demo12345'};
+const API='http://127.0.0.1:8000', DEMO={email:'wewe-test-20261020@example.com',password:'TestPass123!'};
 let TOKEN=null,D=null,BAL=0;
+let chatHistory = [];
 const usd=c=>'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2});
 const fd=d=>d?new Date(d+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
 const day=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
@@ -267,14 +271,6 @@ function count(el,to,d=1400){const dec=!Number.isInteger(to),t0=performance.now(
 async function api(path,opt={}){
   const r=await fetch(API+path,{...opt,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}});
   const j=await r.json().catch(()=>({}));
-  if(r.status===401){
-    // Token expired — re-login silently and retry once
-    await login();
-    const r2=await fetch(API+path,{...opt,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}});
-    const j2=await r2.json().catch(()=>({}));
-    if(!r2.ok)throw new Error(typeof j2.detail==='string'?j2.detail:'Request failed');
-    return j2;
-  }
   if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:'Request failed');return j}
 const post=(p,b)=>api(p,{method:'POST',body:b?JSON.stringify(b):undefined});
 async function login(){
@@ -334,47 +330,83 @@ $('#mv').onclick=async()=>{const b=nextDue();if(!b)return;try{const r=await post
 $('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary ${usd(r.salary_added)} added and split ✓`);await load()}catch(e){toast(e.message)}};
 
 /* ===== WEWE chat ===== */
-let _chatHistory=[];
+
 async function askWewe(text){
-  const q=text.toLowerCase().trim();
+  const q = text.toLowerCase();
 
-  // Only intercept explicit one-shot action commands — everything else goes to Gemini.
-  // "Show my bills" / "List bills" — unambiguous data fetch
-  if(/^(show|list|what are|tell me)( my)? bills?$/i.test(text.trim())){
-    const d=await api('/me/dashboard'),l=d.buckets.filter(b=>b.kind!=='savings');
-    return l.length?l.map(b=>`${b.name}: ${usd(b.saved)} of ${usd(b.amount_due)} set aside, due ${fd(b.due_date)}`).join('. ')+'.':'You have no bills yet.'}
-  // "Show my reminders" / "Any reminders?"
-  if(/^(show|any|do i have)( my)? reminder/i.test(text.trim())){
-    const r=(await api('/me/reminders')).reminders;
-    return r.length?r.map(x=>`${x.name} is due in ${x.days_left} days and still needs ${usd(x.still_needed)}`).join('. ')+'.':'No bills are due in the next 3 days. You\'re all set.'}
-  // "Show spending report" / "Spending report"
-  if(/^(show( my)?|spending) report$/i.test(text.trim())||/^show my spending$/i.test(text.trim())){
-    const r=await api('/me/report'),k=Object.entries(r.by_category);
-    return k.length?`This month you spent ${usd(r.total)}: `+k.map(([c,v])=>`${c} ${usd(v)}`).join(', ')+'.':'No spending yet this month.'}
-  // "Split my salary" chip / "Payday" / "Add salary"
-  if(/^(split my salary|payday|add salary)$/i.test(text.trim())){
-    const r=await post('/me/payday');await load();
-    return `Added ${usd(r.salary_added)}. I set aside `+r.plan.map(p=>`${usd(p.set_aside)} for ${p.bucket}`).join(', ')+'.'}
+  if(/\b(plan|list|show|what|all)\b/.test(q) && /bill/.test(q)){
+    const d = await api('/me/dashboard');
+    const l = d.buckets.filter(b => b.kind !== 'savings');
+    return l.length
+      ? l.map(b => `${b.name}: ${usd(b.saved)} of ${usd(b.amount_due)} set aside, due ${fd(b.due_date)}`).join('. ') + '.'
+      : 'You have no bills yet.';
+  }
 
-  // Everything else — general questions, financial reasoning, follow-ups, arithmetic — goes to Gemini
-  const r=await post('/me/wewe/chat',{message:text,history:_chatHistory});
-  if(r.source==='error') return `⚠️ ${r.reply}`;
-  return r.reply||'Sorry, I couldn\'t get a response right now.';
+  if(/bill|remind/.test(q)){
+    const r = (await api('/me/reminders')).reminders;
+    return r.length
+      ? r.map(x => `${x.name} is due in ${x.days_left} days and still needs ${usd(x.still_needed)}`).join('. ') + '.'
+      : "No bills are due in the next 3 days. You're all set.";
+  }
+
+  if(/report|spending/.test(q)){
+    const r = await api('/me/report');
+    const k = Object.entries(r.by_category);
+    return k.length
+      ? `This month you spent ${usd(r.total)}: ` + k.map(([c,v]) => `${c} ${usd(v)}`).join(', ') + '.'
+      : 'No spending yet this month.';
+  }
+
+  if(/split|salary|payday/.test(q)){
+    const r = await post('/me/payday');
+    await load();
+    return `Added ${usd(r.salary_added)}. I set aside ` + r.plan.map(p => `${usd(p.set_aside)} for ${p.bucket}`).join(', ') + '.';
+  }
+
+  if(/limit/.test(q)){
+    const d = await api('/me/dashboard');
+    const w = d.weekly;
+    return w.limit
+      ? `Your weekly limit is ${usd(w.limit)} and you have ${usd(w.left)} left.`
+      : 'You have no weekly limit set yet.';
+  }
+
+  if(/saving|save for|put aside/.test(q)){
+    const d = await api('/me/dashboard');
+    const s = d.buckets.find(b => b.kind === 'savings');
+    return s
+      ? `You've saved ${usd(s.saved)} of ${usd(s.amount_due)} for ${s.name}. Keep going!`
+      : 'You have no savings goal yet.';
+  }
+
+  if(/afford|buy|can i/.test(q)){
+    const m = q.match(/\$?([\d,]+(?:\.\d{1,2})?)([km]?)/i);
+    if(!m) return 'Tell me the price, like "Can I afford $60?"';
+
+    let amt = parseFloat(m[1].replace(/,/g,''));
+    if(m[2].toLowerCase() === 'k') amt *= 1000;
+    if(m[2].toLowerCase() === 'm') amt *= 1000000;
+
+    return (await api('/me/afford?amount=' + Math.round(amt * 100))).message;
+  }
+
+  const result = await post('/me/wewe/chat', {
+    message: text,
+    history: chatHistory.slice(0, -1)
+  });
+
+  return result.reply;
 }
-
 const msgs=$('#msgs');
 function bubble(cls,html=''){const d=document.createElement('div');d.className='m '+cls;d.innerHTML=html;msgs.appendChild(d);d.scrollIntoView({block:'center',behavior:'smooth'});return d}
 async function send(text){
   text=text.trim();if(!text)return;
   $('#inp').value='';$('#chips').style.display='none';
   bubble('u').textContent=text;
+  chatHistory.push({ role: 'user', content: text });
   const w=bubble('w','<div class="dots"><i></i><i></i><i></i></div>');
-  let reply;
-  try{reply=await askWewe(text)}
-  catch(e){reply='I couldn\'t reach the server. Please try again.'}
-  // update rolling history for LLM context (keep last 6 messages = 3 pairs)
-  _chatHistory.push({role:'user',content:text},{role:'assistant',content:reply});
-  if(_chatHistory.length>6)_chatHistory=_chatHistory.slice(-6);
+  let reply;try{reply=await askWewe(text)}catch(e){reply='I couldn\'t reach the server. Please try again.'}
+  chatHistory.push({ role: 'assistant', content: reply });
   w.textContent='';
   for(const ch of reply){w.textContent+=ch;await new Promise(r=>setTimeout(r,14))}
   w.scrollIntoView({block:'center'});
@@ -425,8 +457,24 @@ $('#qrGen').onclick=async()=>{
   const v=parseFloat($('#qrAmt').value),note=$('#qrNote').value;
   if(!(v>0))return toast('Enter an amount to request');
   try{const r=await api(`/me/qr/generate?amount=${Math.round(v*100)}&note=${encodeURIComponent(note)}`,{method:'POST'});
-    $('#qrTokenOut').textContent=r.token;
-    $('#qrResult').style.display='block'}catch(e){toast(e.message)}};
+    $('#qrTokenOut').textContent = r.token;
+
+$('#qrImage').innerHTML = '';
+
+new QRCode(document.getElementById('qrImage'), {
+  text: r.token,
+  width: 220,
+  height: 220,
+  correctLevel: QRCode.CorrectLevel.M
+});
+
+$('#qrGenArea').style.display = 'none';
+$('#qrResult').style.display = 'block';
+$('#qrResult').style.visibility = 'visible';
+} catch(e) {
+  toast(e.message);
+}
+};
 $('#qrPay').onclick=async()=>{
   const token=$('#qrToken').value.trim();
   if(!token)return toast('Paste a token first');
