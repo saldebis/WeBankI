@@ -592,7 +592,9 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
     try:
         import urllib.request, json as _json, urllib.error as _ue
         if provider == "gemini":
-            gemini_model = model or "gemini-2.0-flash"
+            # Strip any accidental "models/" prefix — the URL already includes it
+            raw_model = (model or "gemini-1.5-flash").strip()
+            gemini_model = raw_model.removeprefix("models/")
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
             # Use systemInstruction (native Gemini field) — avoids injecting system as a fake user turn
             contents = []
@@ -628,11 +630,10 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
             reply = data["choices"][0]["message"]["content"].strip()
         return {"reply": reply, "source": "llm"}
     except _ue.HTTPError as e:
-        # Surface API errors clearly instead of silently falling back
         try:
             err = _json.loads(e.read()).get("error", {}).get("message", str(e))
         except Exception:
             err = str(e)
-        return {"reply": f"I couldn't reach my AI brain right now ({err}). Here's what I know: {_rule_based_reply(uid, b.message)}", "source": "error"}
-    except Exception as e:
-        return {"reply": f"I couldn't reach my AI brain right now. Here's what I know: {_rule_based_reply(uid, b.message)}", "source": "error"}
+        return {"reply": f"⚠️ AI unavailable: {err}", "source": "error"}
+    except Exception as ex:
+        return {"reply": f"⚠️ AI unavailable: {ex}", "source": "error"}
