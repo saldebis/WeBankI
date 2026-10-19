@@ -129,9 +129,9 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
     <div class="row"><div><div class="lbl">Monthly salary</div><div class="sal" id="sal">$0</div></div><div class="pill" id="pay">Payday soon</div></div>
   </div>
   <div class="acts">
-    <button class="btn" data-t="Send: coming soon">Send</button>
-    <button class="btn" data-t="Scan to pay: coming soon">Scan to pay</button>
-    <button class="btn" data-t="Split bill: coming soon">Split bill</button>
+    <button class="btn" id="btnSend">Send</button>
+    <button class="btn" id="btnQR">Scan to pay</button>
+    <button class="btn" id="btnSplit">Split bill</button>
   </div>
   <div class="card tip">
     <span data-bot="34"></span>
@@ -192,6 +192,56 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
     <div class="card"><div class="goalhead"><span>Spent this month</span><span class="pct" id="rTot">$0</span></div><div id="rList"><div class="sub">No spending yet.</div></div></div>
   </div></div>
 </section>
+</div>
+
+<!-- SEND MODAL -->
+<div id="modalSend" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:24px;width:min(360px,90vw)">
+    <div style="font-size:18px;font-weight:700;margin-bottom:16px">Send money</div>
+    <div class="k">Recipient email</div><input class="fld" id="sndEmail" type="email" placeholder="friend@email.com">
+    <div class="k" style="margin-top:12px">Amount ($)</div><input class="fld" id="sndAmt" type="number" min="0.01" step="0.01" placeholder="25.00">
+    <div class="k" style="margin-top:12px">Note (optional)</div><input class="fld" id="sndNote" placeholder="Dinner">
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="mv" id="sndGo" style="flex:1;padding:13px">Send</button>
+      <button class="mv" onclick="closeModal('modalSend')" style="flex:1;padding:13px;background:var(--line);color:var(--text)">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div id="modalQR" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:24px;width:min(360px,90vw)">
+    <div style="font-size:18px;font-weight:700;margin-bottom:16px">Scan to pay</div>
+    <div id="qrGenArea">
+      <div class="k">Amount to request ($)</div><input class="fld" id="qrAmt" type="number" min="0.01" step="0.01" placeholder="10.00">
+      <div class="k" style="margin-top:12px">Note (optional)</div><input class="fld" id="qrNote" placeholder="Coffee">
+      <button class="mv" id="qrGen" style="margin-top:14px;width:100%;padding:13px">Generate QR code</button>
+      <div style="margin:16px 0;text-align:center;color:var(--muted);font-size:14px">— or pay someone else's code —</div>
+      <div class="k">Paste a QR token</div><input class="fld" id="qrToken" placeholder="Paste token here">
+      <button class="mv" id="qrPay" style="margin-top:10px;width:100%;padding:13px">Pay this code</button>
+    </div>
+    <div id="qrResult" style="display:none;text-align:center;padding:10px 0">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Share this token:</div>
+      <div id="qrTokenOut" style="font-weight:700;font-size:15px;word-break:break-all;background:var(--bg);border-radius:12px;padding:12px"></div>
+    </div>
+    <button class="mv" onclick="closeModal('modalQR')" style="width:100%;padding:13px;margin-top:14px;background:var(--line);color:var(--text)">Close</button>
+  </div>
+</div>
+
+<!-- SPLIT MODAL -->
+<div id="modalSplitBill" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:24px;width:min(360px,90vw)">
+    <div style="font-size:18px;font-weight:700;margin-bottom:16px">Split bill</div>
+    <div class="k">Total amount ($)</div><input class="fld" id="spAmt" type="number" min="0.01" step="0.01" placeholder="120.00">
+    <div class="k" style="margin-top:12px">Split with (emails, comma-separated)</div><input class="fld" id="spEmails" placeholder="alice@x.com, bob@x.com">
+    <div class="k" style="margin-top:12px">Note (optional)</div><input class="fld" id="spNote" placeholder="Dinner">
+    <div id="spPreview" style="margin-top:10px;font-size:14px;color:var(--muted)"></div>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="mv" id="spGo" style="flex:1;padding:13px">Split</button>
+      <button class="mv" onclick="closeModal('modalSplitBill')" style="flex:1;padding:13px;background:var(--line);color:var(--text)">Cancel</button>
+    </div>
+    <div id="spOwed" style="margin-top:16px"></div>
+  </div>
 </div>
 
 <form class="ask" id="ask" onsubmit="return false"><input id="inp" placeholder="Ask WEWE anything" autocomplete="off"><button class="go" id="go" type="button">Go</button></form>
@@ -323,7 +373,59 @@ $('#exGo').onclick=async()=>{const v=parseFloat($('#exA').value);if(!(v>0))retur
     toast(r.round_up_saved?`Added. WEWE saved ${usd(r.round_up_saved)} from the round-up ✓`:'Expense added ✓');
     if(r.warning)setTimeout(()=>toast(r.warning),2800);
     $('#exA').value='';$('#exN').value='';await load();await loadReport()}catch(e){toast(e.message)}};
-(async()=>{try{await login();await load()}catch(e){toast('Can’t reach the backend. Start it, then refresh.')}})();
+(async()=>{try{await login();await load()}catch(e){toast('Can\'t reach the backend. Start it, then refresh.')}})();
+
+/* ===== Modals ===== */
+function openModal(id){const m=$('#'+id);m.style.display='flex'}
+function closeModal(id){const m=$('#'+id);m.style.display='none'}
+
+/* --- Send --- */
+$('#btnSend').onclick=()=>openModal('modalSend');
+$('#sndGo').onclick=async()=>{
+  const email=$('#sndEmail').value.trim(),v=parseFloat($('#sndAmt').value),note=$('#sndNote').value;
+  if(!email)return toast('Enter recipient email');
+  if(!(v>0))return toast('Enter an amount');
+  try{const r=await post('/me/send',{to_email:email,amount:Math.round(v*100),note});
+    toast(`Sent ${usd(r.sent)} to ${r.to} ✓`);closeModal('modalSend');
+    $('#sndEmail').value='';$('#sndAmt').value='';$('#sndNote').value='';
+    await load()}catch(e){toast(e.message)}};
+
+/* --- QR / Scan to pay --- */
+$('#btnQR').onclick=()=>{$('#qrResult').style.display='none';$('#qrGenArea').style.display='block';openModal('modalQR')};
+$('#qrGen').onclick=async()=>{
+  const v=parseFloat($('#qrAmt').value),note=$('#qrNote').value;
+  if(!(v>0))return toast('Enter an amount to request');
+  try{const r=await api(`/me/qr/generate?amount=${Math.round(v*100)}&note=${encodeURIComponent(note)}`,{method:'POST'});
+    $('#qrTokenOut').textContent=r.token;
+    $('#qrResult').style.display='block'}catch(e){toast(e.message)}};
+$('#qrPay').onclick=async()=>{
+  const token=$('#qrToken').value.trim();
+  if(!token)return toast('Paste a token first');
+  try{const r=await api(`/me/qr/pay?token=${encodeURIComponent(token)}`,{method:'POST'});
+    toast(`Paid ${usd(r.paid)} to ${r.to} ✓`);closeModal('modalQR');$('#qrToken').value='';await load()}catch(e){toast(e.message)}};
+
+/* --- Split bill --- */
+$('#btnSplit').onclick=async()=>{
+  // load pending splits when opening
+  try{const s=await api('/me/splits');
+    const rows=[...s.owed_to_you.map(x=>`<div class="lg"><span>${x.payer_name} owes you</span><b>${usd(x.amount)}</b></div>`),
+                ...s.you_owe.map(x=>`<div class="lg" style="color:var(--muted)"><span>You owe ${x.owner_name}</span><b><button class="mv" style="padding:4px 12px;font-size:13px" onclick="settleOwed(${x.id})">Settle ${usd(x.amount)}</button></b></div>`)];
+    $('#spOwed').innerHTML=rows.length?'<div style="font-size:14px;font-weight:700;margin-bottom:6px">Pending splits</div>'+rows.join(''):'';
+  }catch(e){}
+  openModal('modalSplitBill')};
+async function settleOwed(id){
+  try{const r=await post(`/me/splits/${id}/settle`);toast(`Settled ${usd(r.settled)} to ${r.to} ✓`);await load();$('#btnSplit').onclick()}catch(e){toast(e.message)}}
+$('#spAmt').oninput=$('#spEmails').oninput=()=>{
+  const v=parseFloat($('#spAmt').value),emails=$('#spEmails').value.split(',').map(e=>e.trim()).filter(Boolean);
+  if(v>0&&emails.length)$('#spPreview').textContent=`Each person pays $${(v/(emails.length+1)/100*100).toFixed(2)}`;
+  else $('#spPreview').textContent=''};
+$('#spGo').onclick=async()=>{
+  const v=parseFloat($('#spAmt').value),emails=$('#spEmails').value.split(',').map(e=>e.trim()).filter(Boolean),note=$('#spNote').value;
+  if(!(v>0))return toast('Enter a total amount');
+  if(!emails.length)return toast('Enter at least one email');
+  try{const r=await post('/me/split',{amount:Math.round(v*100),participants:emails,note});
+    toast(`Split created! Each owes ${usd(r.share_each)} ✓`);closeModal('modalSplitBill');
+    $('#spAmt').value='';$('#spEmails').value='';$('#spNote').value=''}catch(e){toast(e.message)}};
 </script>
 </body>
 </html>

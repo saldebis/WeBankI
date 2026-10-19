@@ -30,6 +30,10 @@ with db() as c:
         amount_due INT, saved INT DEFAULT 0, due_date TEXT);
     CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, user_id INT, amount INT,
         category TEXT, note TEXT, created_at TEXT);
+    CREATE TABLE IF NOT EXISTS splits(id INTEGER PRIMARY KEY, owner_id INT, payer_id INT,
+        amount INT, note TEXT, settled INT DEFAULT 0, created_at TEXT);
+    CREATE TABLE IF NOT EXISTS qr_tokens(id INTEGER PRIMARY KEY, token TEXT UNIQUE, user_id INT,
+        amount INT, note TEXT, used INT DEFAULT 0, created_at TEXT);
     """)
 
 # ---------- auth ----------
@@ -239,6 +243,133 @@ def report(uid: int = Depends(current_uid)):
                          "GROUP BY category", (uid, since)).fetchall()
         return {"since": since, "by_category": {r["category"]: r["t"] for r in rows},
                 "total": sum(r["t"] for r in rows), "week_spent": week_spent(c, uid)}
+
+# ---------- send ----------
+class SendIn(BaseModel):
+    to_email: str
+    amount: int = Field(..., gt=0, description="cents")
+    note: str = ""
+
+@app.post("/me/send")
+def send_money(b: SendIn, uid: int = Depends(current_uid)):
+    """Transfer money to another registered user."""
+    with db() as c:
+        sender = get_user(c, uid)
+        recipient = c.execute("SELECT * FROM users WHERE email=?", (b.to_email.lower(),)).fetchone()
+        if not recipient:
+            raise HTTPException(404, "Recipient not found")
+        if recipient["id"] == uid:
+            raise HTTPException(400, "Cannot send money to yourself")
+        if b.amount > sender["balance"]:
+            raise HTTPException(400, "Insufficient balance")
+        c.execute("UPDATE users SET balance=balance-? WHERE id=?", (b.amount, uid))
+        c.execute("UPDATE users SET balance=balance+? WHERE id=?", (b.amount, recipient["id"]))
+        c.execute("INSERT INTO transactions(user_id,amount,category,note,created_at) VALUES(?,?,?,?,?)",
+                  (uid, b.amount, "send", f"To {recipient['name']}: {b.note}", now()))
+        c.execute("INSERT INTO transactions(user_id,amount,category,note,created_at) VALUES(?,?,?,?,?)",
+                  (recipient["id"], b.amount, "receive", f"From {sender['name']}: {b.note}", now()))
+    return {"sent": b.amount, "to": recipient["name"], "to_email": b.to_email.lower()}
+
+# ---------- qr ----------
+@app.post("/me/qr/generate")
+def qr_generate(amount: int, note: str = "", uid: int = Depends(current_uid)):
+    """Generate a one-time QR token for receiving a payment."""
+    token = secrets.token_urlsafe(24)
+    with db() as c:
+        c.execute("INSERT INTO qr_tokens(token,user_id,amount,note,created_at) VALUES(?,?,?,?,?)",
+                  (token, uid, amount, note, now()))
+    return {"token": token, "amount": amount, "note": note}
+
+@app.post("/me/qr/pay")
+def qr_pay(token: str, uid: int = Depends(current_uid)):
+    """Pay a QR token — deducts from the scanner's balance, credits the token owner."""
+    with db() as c:
+        row = c.execute("SELECT * FROM qr_tokens WHERE token=?", (token,)).fetchone()
+        if not row:
+            raise HTTPException(404, "QR code not found")
+        if row["used"]:
+            raise HTTPException(400, "QR code already used")
+        if row["user_id"] == uid:
+            raise HTTPException(400, "Cannot pay your own QR code")
+        payer = get_user(c, uid)
+        if row["amount"] > payer["balance"]:
+            raise HTTPException(400, "Insufficient balance")
+        c.execute("UPDATE qr_tokens SET used=1 WHERE token=?", (token,))
+        c.execute("UPDATE users SET balance=balance-? WHERE id=?", (row["amount"], uid))
+        c.execute("UPDATE users SET balance=balance+? WHERE id=?", (row["amount"], row["user_id"]))
+        owner = get_user(c, row["user_id"])
+        c.execute("INSERT INTO transactions(user_id,amount,category,note,created_at) VALUES(?,?,?,?,?)",
+                  (uid, row["amount"], "qr_pay", f"QR pay to {owner['name']}: {row['note']}", now()))
+        c.execute("INSERT INTO transactions(user_id,amount,category,note,created_at) VALUES(?,?,?,?,?)",
+                  (row["user_id"], row["amount"], "qr_receive", f"QR from {payer['name']}: {row['note']}", now()))
+    return {"paid": row["amount"], "to": owner["name"], "note": row["note"]}
+
+# ---------- split bill ----------
+class SplitIn(BaseModel):
+    amount: int = Field(..., gt=0, description="total cents to split")
+    participants: list = Field(..., description="list of emails to split with")
+    note: str = ""
+
+@app.post("/me/split")
+def create_split(b: SplitIn, uid: int = Depends(current_uid)):
+    """Split a bill equally between yourself and a list of other users."""
+    if not b.participants:
+        raise HTTPException(400, "Provide at least one participant email")
+    with db() as c:
+        owner = get_user(c, uid)
+        payers = []
+        for email in b.participants:
+            u = c.execute("SELECT * FROM users WHERE email=?", (email.lower(),)).fetchone()
+            if not u:
+                raise HTTPException(404, f"User not found: {email}")
+            if u["id"] == uid:
+                raise HTTPException(400, "Don't include yourself in participants")
+            payers.append(u)
+        share = b.amount // (len(payers) + 1)  # your share + each participant's share
+        ids = []
+        for p in payers:
+            cur = c.execute(
+                "INSERT INTO splits(owner_id,payer_id,amount,note,created_at) VALUES(?,?,?,?,?)",
+                (uid, p["id"], share, b.note, now()))
+            ids.append(cur.lastrowid)
+    return {"total": b.amount, "share_each": share, "splits_created": ids,
+            "participants": [p["name"] for p in payers]}
+
+@app.get("/me/splits")
+def list_splits(uid: int = Depends(current_uid)):
+    """List splits you are owed (owner) and splits you owe (payer)."""
+    with db() as c:
+        owed = [dict(r) for r in c.execute(
+            "SELECT s.*,u.name payer_name,u.email payer_email FROM splits s JOIN users u ON u.id=s.payer_id "
+            "WHERE s.owner_id=? AND s.settled=0", (uid,))]
+        owe = [dict(r) for r in c.execute(
+            "SELECT s.*,u.name owner_name,u.email owner_email FROM splits s JOIN users u ON u.id=s.owner_id "
+            "WHERE s.payer_id=? AND s.settled=0", (uid,))]
+    return {"owed_to_you": owed, "you_owe": owe}
+
+@app.post("/me/splits/{sid}/settle")
+def settle_split(sid: int, uid: int = Depends(current_uid)):
+    """Payer settles a split — money moves from payer to owner."""
+    with db() as c:
+        row = c.execute("SELECT * FROM splits WHERE id=?", (sid,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Split not found")
+        if row["payer_id"] != uid:
+            raise HTTPException(403, "Only the payer can settle this split")
+        if row["settled"]:
+            raise HTTPException(400, "Already settled")
+        payer = get_user(c, uid)
+        if row["amount"] > payer["balance"]:
+            raise HTTPException(400, "Insufficient balance")
+        c.execute("UPDATE splits SET settled=1 WHERE id=?", (sid,))
+        c.execute("UPDATE users SET balance=balance-? WHERE id=?", (row["amount"], uid))
+        c.execute("UPDATE users SET balance=balance+? WHERE id=?", (row["amount"], row["owner_id"]))
+        owner = get_user(c, row["owner_id"])
+        c.execute("INSERT INTO transactions(user_id,amount,category,note,created_at) VALUES(?,?,?,?,?)",
+                  (uid, row["amount"], "split_pay", f"Split settled to {owner['name']}: {row['note']}", now()))
+        c.execute("INSERT INTO transactions(user_id,amount,category,note,created_at) VALUES(?,?,?,?,?)",
+                  (row["owner_id"], row["amount"], "split_receive", f"Split from {payer['name']}: {row['note']}", now()))
+    return {"settled": row["amount"], "to": owner["name"]}
 
 # ---------- new routes ----------
 class WeeklyLimitIn(BaseModel):
