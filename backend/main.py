@@ -488,16 +488,21 @@ def _financial_snapshot(uid: int) -> str:
     return "\n".join(lines)
 
 _SYSTEM_PROMPT = """You are WEWE, a friendly green robot money assistant for the WEBANKI app.
+
 Rules:
-- You have access to the user's real financial snapshot below. Use it to answer financial questions.
-- If the user asks arithmetic (e.g. "4400-500", "what is 8000 minus 99"), compute and answer it directly.
-- If the user asks something ambiguous or unclear (like a single letter), ask them to clarify in a friendly way.
-- If the user asks about their finances, use ONLY the numbers from the financial snapshot — never invent figures.
-- Keep answers under 80 words.
+- You have access to the user's real financial snapshot. Use it to answer financial questions accurately.
+- For arithmetic (e.g. "888-99", "what is 4400 minus 500"), compute the result and show it clearly.
+- For savings timeline questions (e.g. "how many months to save for X?"):
+    1. If the goal amount and monthly savings are known from the snapshot or conversation, calculate: months = ceil((goal - already_saved) / monthly_savings).
+    2. If monthly savings capacity is unknown, ask the user for it. Do NOT assume it equals the salary.
+    3. Use numbers from the snapshot or the conversation — never invent figures.
+- For affordability questions, use the safe_to_spend figure from the snapshot.
+- For ambiguous short inputs (e.g. a single letter), ask the user to clarify politely.
+- Maintain context from the conversation history. If the user says "what if I save $1,500 instead?" refer back to the prior goal.
+- Keep answers concise (under 120 words). If a calculation requires more steps, show the working briefly.
 - Answer in the user's language (English or Arabic).
-- You can answer general friendly conversation briefly, then guide back to budgeting.
-- This is a simulated app — never claim to move real money or provide professional financial advice.
-- Be warm, concise, and helpful."""
+- You may answer brief general conversation, then guide back to budgeting.
+- This is a simulated app. Never claim to move real money or give professional financial advice."""
 
 def _rule_based_reply(uid: int, text: str) -> str:
     """Fallback when LLM is unavailable. Never returns an unrelated financial warning."""
@@ -575,33 +580,29 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
     if not api_key:
         return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
 
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT + "\n\nCurrent financial snapshot:\n" + snapshot},
-    ]
+    # Build conversation turns (history + current message), excluding system
+    turns = []
     for h in (b.history or []):
         if isinstance(h, dict) and h.get("role") in ("user", "assistant"):
-            messages.append({"role": h["role"], "content": str(h.get("content", ""))})
-    messages.append({"role": "user", "content": b.message})
+            turns.append({"role": h["role"], "content": str(h.get("content", ""))})
+    turns.append({"role": "user", "content": b.message})
+
+    system_content = _SYSTEM_PROMPT + "\n\nCurrent financial snapshot:\n" + snapshot
 
     try:
-        import urllib.request, json as _json
+        import urllib.request, json as _json, urllib.error as _ue
         if provider == "gemini":
-            # Google Gemini API
             gemini_model = model or "gemini-2.0-flash"
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
-            # Convert messages to Gemini format (system prompt becomes first user/model exchange)
+            # Use systemInstruction (native Gemini field) — avoids injecting system as a fake user turn
             contents = []
-            for msg in messages:
-                if msg["role"] == "system":
-                    contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
-                    contents.append({"role": "model", "parts": [{"text": "Understood. I am WEWE, ready to help."}]})
-                elif msg["role"] == "user":
-                    contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
-                elif msg["role"] == "assistant":
-                    contents.append({"role": "model", "parts": [{"text": msg["content"]}]})
+            for t in turns:
+                role = "model" if t["role"] == "assistant" else "user"
+                contents.append({"role": role, "parts": [{"text": t["content"]}]})
             payload = _json.dumps({
+                "systemInstruction": {"parts": [{"text": system_content}]},
                 "contents": contents,
-                "generationConfig": {"maxOutputTokens": 200, "temperature": 0.4}
+                "generationConfig": {"maxOutputTokens": 400, "temperature": 0.5}
             }).encode()
             req = urllib.request.Request(url, data=payload,
                                          headers={"Content-Type": "application/json"},
@@ -610,11 +611,14 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
                 data = _json.loads(resp.read())
             reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         else:
+            messages = [{"role": "system", "content": system_content}] + [
+                {"role": t["role"], "content": t["content"]} for t in turns
+            ]
             if provider == "watsonx":
                 url = base_url or "https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2024-05-13"
             else:
                 url = (base_url.rstrip("/") + "/chat/completions") if base_url else "https://api.openai.com/v1/chat/completions"
-            payload = _json.dumps({"model": model, "messages": messages, "max_tokens": 200, "temperature": 0.4}).encode()
+            payload = _json.dumps({"model": model, "messages": messages, "max_tokens": 400, "temperature": 0.5}).encode()
             req = urllib.request.Request(url, data=payload,
                                          headers={"Content-Type": "application/json",
                                                   "Authorization": f"Bearer {api_key}"},
@@ -623,5 +627,12 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
                 data = _json.loads(resp.read())
             reply = data["choices"][0]["message"]["content"].strip()
         return {"reply": reply, "source": "llm"}
-    except Exception:
-        return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
+    except _ue.HTTPError as e:
+        # Surface API errors clearly instead of silently falling back
+        try:
+            err = _json.loads(e.read()).get("error", {}).get("message", str(e))
+        except Exception:
+            err = str(e)
+        return {"reply": f"I couldn't reach my AI brain right now ({err}). Here's what I know: {_rule_based_reply(uid, b.message)}", "source": "error"}
+    except Exception as e:
+        return {"reply": f"I couldn't reach my AI brain right now. Here's what I know: {_rule_based_reply(uid, b.message)}", "source": "error"}
