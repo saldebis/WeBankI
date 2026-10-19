@@ -286,10 +286,15 @@ async function askWewe(text){
     return `Added ${usd(r.salary_added)}. I set aside `+r.plan.map(p=>`${usd(p.set_aside)} for ${p.bucket}`).join(', ')+'.'}
   if(/limit/.test(q)){const d=await api('/me/dashboard'),w=d.weekly;return w.limit?`Your weekly limit is ${usd(w.limit)} and you have ${usd(w.left)} left.`:'You have no weekly limit set yet.'}
   if(/saving/.test(q)){const d=await api('/me/dashboard'),s=d.buckets.find(b=>b.kind==='savings');return s?`You've saved ${usd(s.saved)} of ${usd(s.amount_due)} for ${s.name}. Keep going!`:'You have no savings goal yet.'}
-  if(/afford|buy|can i/.test(q)){const m=q.match(/(\d+(?:\.\d{1,2})?)/);
+  if(/afford|buy|can i/.test(q)){
+    const m=q.match(/\$?([\d,]+(?:\.\d{1,2})?)([km]?)/i);
     if(!m)return 'Tell me the price, like "Can I afford $60?"';
-    return (await api('/me/afford?amount='+Math.round(m[1]*100))).message}
-  return (await api('/me/dashboard')).wewe_tip;
+    let amt=parseFloat(m[1].replace(/,/g,''));
+    if(m[2].toLowerCase()==='k')amt*=1000;
+    if(m[2].toLowerCase()==='m')amt*=1000000;
+    return (await api('/me/afford?amount='+Math.round(amt*100))).message}
+  const d=await api('/me/dashboard');
+  return `You have $${(d.safe_to_spend/100).toFixed(2)} safe to spend. Ask me "Can I afford $X?", "Show my bills", "Savings", or "Spending report".`;
 }
 
 const msgs=$('#msgs');
