@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WEBANKI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EAF8F0;--card:#F7FEFA;--line:#CDEEDD;--text:#06261A;--muted:#4C6E5F;
+  --g1:#00E676;--g2:#12B76A;--g3:#0A7A4B;--deep:#03170F;--deep2:#0A3D29;--chip:#fff;
+  color-scheme:light;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#04120C;--card:#0A2217;--line:#14402B;--text:#E6FBF0;--muted:#86B8A0;--chip:#0A2217;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#04120C;--card:#0A2217;--line:#14402B;--text:#E6FBF0;--muted:#86B8A0;--chip:#0A2217;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100%}
+.app{max-width:430px;margin:0 auto;padding:18px 18px 110px;position:relative}
+.screen{display:none}.screen.on{display:block;animation:swap .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes swap{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.logo{font-size:28px;font-weight:700;letter-spacing:-.5px;background:linear-gradient(90deg,var(--g3),var(--g1));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hi{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:15px}
+.bot{display:block}.bot .eye{transform-origin:center;animation:blink 4.5s infinite}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+.bot .ant{animation:pulse 2s infinite}@keyframes pulse{50%{opacity:.35}}
+
+/* balance card: the one big moment */
+.bal{position:relative;overflow:hidden;border-radius:30px;padding:24px;color:#fff;background:linear-gradient(135deg,var(--deep),var(--deep2));box-shadow:0 18px 50px -14px rgba(0,230,118,.45)}
+.bal::before,.bal::after{content:"";position:absolute;border-radius:50%;filter:blur(40px);opacity:.55;animation:drift 9s ease-in-out infinite alternate}
+.bal::before{width:220px;height:220px;right:-60px;top:-80px;background:radial-gradient(circle,#00E676,transparent 70%)}
+.bal::after{width:200px;height:200px;left:-50px;bottom:-90px;background:radial-gradient(circle,#12B76A,transparent 70%);animation-delay:-4s}
+@keyframes drift{to{transform:translate(-40px,30px) scale(1.25)}}
+.bal>*{position:relative;z-index:1}
+.lbl{font-size:14px;color:#8CF3BE;letter-spacing:.2px}
+.big{font-size:52px;font-weight:700;letter-spacing:-1.5px;line-height:1.1;margin:4px 0 16px;background:linear-gradient(90deg,#5CF2A8,#00E676 60%,#B8FFD9);-webkit-background-clip:text;background-clip:text;color:transparent}
+.row{display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(140,243,190,.2);padding-top:14px}
+.sal{font-size:22px;font-weight:700}
+.pill{background:linear-gradient(90deg,#00E676,#5CF2A8);color:#03170F;font-weight:700;font-size:14px;padding:9px 14px;border-radius:99px}
+
+.acts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.btn{border:0;font:inherit;font-weight:700;font-size:16px;color:#03170F;padding:17px 6px;border-radius:20px;cursor:pointer;background:linear-gradient(135deg,#5CF2A8,#00E676 55%,#12B76A);box-shadow:0 8px 20px -8px rgba(0,230,118,.7);transition:transform .15s}
+.btn:active{transform:scale(.94)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:16px}
+.tip{display:flex;gap:12px;align-items:center;margin-bottom:12px;position:relative;overflow:hidden}
+.tip::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(0,230,118,.18) 50%,transparent 60%);transform:translateX(-100%);animation:shine 5s 1.5s infinite}
+@keyframes shine{to{transform:translateX(100%)}}
+.tip p{margin:0;font-size:15px;line-height:1.35}
+.mv{margin-top:8px;border:0;font:inherit;font-weight:700;font-size:13px;padding:7px 14px;border-radius:99px;color:#03170F;background:linear-gradient(90deg,#00E676,#5CF2A8);cursor:pointer}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.k{font-size:14px;color:var(--muted)}
+.amt{font-size:28px;font-weight:700;letter-spacing:-.5px;margin:2px 0}
+.sub{font-size:14px;color:var(--muted);margin-bottom:10px}
+.bar{height:8px;border-radius:9px;background:var(--line);overflow:hidden}
+.fill{height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,var(--g3),var(--g1),#8CFFC2);background-size:200% 100%;transition:width 1.4s cubic-bezier(.2,.8,.2,1);animation:flow 3s linear infinite}
+@keyframes flow{to{background-position:-200% 0}}
+.goalhead{display:flex;justify-content:space-between;font-weight:700;margin-bottom:10px}
+.pct{color:var(--g2)}
+
+/* chat */
+.hero{text-align:center;padding:6px 0 14px}
+.hero .halo{display:inline-block;filter:drop-shadow(0 0 28px rgba(0,230,118,.65));animation:float 3.5s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-6px)}}
+.hero h2{margin:6px 0 0;font-size:30px;letter-spacing:-.5px}.hero p{margin:2px 0 0;color:var(--muted)}
+.msgs{display:flex;flex-direction:column;gap:10px}
+.m{max-width:82%;padding:12px 16px;border-radius:22px;font-size:15px;line-height:1.4;animation:swap .35s ease}
+.m.w{background:var(--card);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:8px}
+.m.u{background:linear-gradient(135deg,var(--deep2),var(--deep));color:#fff;align-self:flex-end;border-bottom-right-radius:8px}
+.dots{display:flex;gap:5px;padding:4px 0}.dots i{width:8px;height:8px;border-radius:50%;background:var(--g2);animation:bounce 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bounce{40%{transform:translateY(-6px);opacity:.5}}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px}
+.chip{font:inherit;font-size:15px;color:var(--text);background:var(--chip);border:1.5px solid var(--g2);border-radius:99px;padding:10px 16px;cursor:pointer}
+.chip:active{background:var(--line)}
+h3{font-size:16px;color:var(--muted);font-weight:500;margin:6px 0 10px}
+.feat{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px}
+.feat b{display:block;font-size:16px}.feat span{font-size:14px;color:var(--muted)}
+.tg{flex:none;width:50px;height:30px;border-radius:99px;border:0;background:var(--line);position:relative;cursor:pointer;transition:background .3s}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .3s cubic-bezier(.3,1.5,.5,1);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.tg.on{background:linear-gradient(90deg,var(--g2),var(--g1))}.tg.on::after{transform:translateX(20px)}
+.view{font-weight:700;color:var(--g2);font-size:14px}
+.ask{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom,0px));max-width:430px;margin:0 auto;padding:10px 18px;display:none;gap:10px;background:linear-gradient(transparent,var(--bg) 40%)}
+.ask.on{display:flex}
+.ask input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:14px 18px;outline:none}
+.ask input:focus{border-color:var(--g1);box-shadow:0 0 0 3px rgba(0,230,118,.25)}
+.go{border:0;font:inherit;font-weight:700;color:#03170F;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#5CF2A8,#00E676);cursor:pointer;box-shadow:0 8px 20px -6px rgba(0,230,118,.7)}
+nav{position:fixed;left:0;right:0;bottom:0;max-width:430px;margin:0 auto;display:flex;justify-content:space-around;background:var(--bg);border-top:1px solid var(--line);padding:14px 6px calc(14px + env(safe-area-inset-bottom,0px));z-index:5}
+nav button{font:inherit;font-size:15px;background:none;border:0;color:var(--muted);cursor:pointer;position:relative;padding:4px 6px}
+nav button.on{color:var(--text);font-weight:700}
+nav button.on::after{content:"";position:absolute;left:25%;right:25%;bottom:-8px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--g2),var(--g1))}
+.seg{display:flex;gap:3px;height:16px;border-radius:9px;overflow:hidden;background:var(--line);margin-bottom:6px}.seg i{display:block;width:0;transition:width 1.3s cubic-bezier(.2,.8,.2,1)}
+.lg{display:flex;justify-content:space-between;font-size:14px;color:var(--muted);margin-top:8px}.lg b{color:var(--text)}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),transparent 60%),radial-gradient(700px 420px at -5% 110%,rgba(18,183,106,.18),transparent 60%),var(--bg);background-attachment:fixed}
+.cols{display:block}
+@media (min-width:900px){
+  .app{max-width:1080px;padding:30px 32px 120px}
+  .cols{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:28px;align-items:start}
+  .big{font-size:60px}
+  nav{max-width:1080px;justify-content:flex-start;gap:34px;padding-left:32px;padding-right:32px}
+  .ask{max-width:1080px;padding:10px 32px;justify-content:flex-start}
+  .ask input{flex:0 1 354px}
+  .m{max-width:90%}
+}
+.fld{width:100%;font:inherit;font-size:16px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px 14px;outline:none;margin-top:4px}.fld:focus{border-color:var(--g1);box-shadow:0 0 0 3px rgba(0,230,118,.22)}
+.soon{text-align:center;padding:90px 20px;color:var(--muted)}.soon h2{color:var(--text)}
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translate(-50%,-90px);background:var(--deep);color:#8CF3BE;padding:12px 20px;border-radius:99px;font-weight:700;transition:transform .45s cubic-bezier(.3,1.4,.5,1);z-index:9;border:1px solid #12B76A}
+.toast.on{transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="app">
+
+<!-- HOME -->
+<section class="screen on" id="home">
+  <header>
+    <div class="logo">WEBANKI</div>
+    <div class="hi">Hi, <span id="nm">Alex</span> <span data-bot="40"></span></div>
+  </header>
+  <div class="cols"><div class="col">
+  <div class="bal">
+    <div class="lbl">Current balance</div>
+    <div class="big" id="bal">$0</div>
+    <div class="row"><div><div class="lbl">Monthly salary</div><div class="sal" id="sal">$0</div></div><div class="pill" id="pay">Payday soon</div></div>
+  </div>
+  <div class="acts">
+    <button class="btn" data-t="Send: coming soon">Send</button>
+    <button class="btn" data-t="Scan to pay: coming soon">Scan to pay</button>
+    <button class="btn" data-t="Split bill: coming soon">Split bill</button>
+  </div>
+  <div class="card tip">
+    <span data-bot="34"></span>
+    <div><p><b>WEWE says:</b> <span id="tip">Loading your money plan…</span></p><button class="mv" id="mv">Pay now</button></div>
+  </div>
+  </div><div class="col">
+  <div class="grid">
+    <div class="card" id="k-bills"><div class="k">Bills</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-week"><div class="k">Daily life</div><div class="amt">$0</div><div class="sub">Left this week</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-rent"><div class="k">Rent</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-tuition"><div class="k">Tuition</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="goalhead"><span>Where your money is</span><span class="pct" id="planTotal">$0</span></div>
+    <div class="seg" id="seg"></div><div id="legend"></div>
+    <button class="mv" id="split" style="margin-top:12px">Split my salary</button>
+  </div>
+  <div class="card">
+    <div class="goalhead"><span id="goalT">Savings goal</span><span class="pct" id="goalP">0%</span></div>
+    <div class="bar"><div class="fill" id="goalF"></div></div>
+    <div class="sub" style="margin:10px 0 0" id="goalS">—</div>
+  </div>
+  </div></div>
+</section>
+
+<!-- WEWE -->
+<section class="screen" id="wewe"><div class="cols"><div class="col">
+  <div class="hero"><div class="halo" data-bot="110"></div><h2>WEWE</h2><p>Your money robot</p></div>
+  <div class="msgs" id="msgs">
+    <div class="m w" id="hello">Hi! Ask me anything about your money.</div>
+  </div>
+  <div class="chips" id="chips">
+    <button class="chip" data-q="Can I afford $60 this week?">Can I afford something?</button>
+    <button class="chip" data-q="Set weekly limit">Set weekly limit</button>
+    <button class="chip" data-q="Plan my savings">Plan my savings</button>
+    <button class="chip" data-q="Analyse my bills">Analyse my bills</button>
+    <button class="chip" data-q="Split my salary">Split my salary</button>
+  </div>
+  </div><div class="col"><h3>Smart features</h3>
+  <div class="card feat"><div><b>Auto-split salary</b><span>Bills, rent, tuition, savings on payday</span></div><button class="tg on" aria-label="Auto-split salary"></button></div>
+  <div class="card feat"><div><b>Round-up savings</b><span>Spare change goes to your goal</span></div><button class="tg on" aria-label="Round-up savings"></button></div>
+  <div class="card feat"><div><b>Bill reminders</b><span>WEWE alerts you 3 days before</span></div><button class="tg on" aria-label="Bill reminders"></button></div>
+  <div class="card feat"><div><b>Spending report</b><span>Weekly summary by category</span></div><span class="view" id="rep" style="cursor:pointer">View</span></div>
+  </div></div><div style="height:90px"></div>
+</section>
+
+<section class="screen" id="spend">
+  <div class="hero" style="padding-bottom:10px"><h2>Spend</h2><p>Add an expense. WEWE rounds up to your savings.</p></div>
+  <div class="cols"><div class="col">
+    <div class="card" style="margin-bottom:12px">
+      <div class="k">Amount ($)</div><input class="fld" id="exA" type="number" inputmode="decimal" min="0" step="0.01" placeholder="12.40">
+      <div class="k" style="margin-top:12px">Category</div>
+      <select class="fld" id="exC"><option value="weekly">Daily life</option><option value="food">Food</option><option value="transport">Transport</option><option value="fun">Fun</option></select>
+      <div class="k" style="margin-top:12px">Note (optional)</div><input class="fld" id="exN" placeholder="Lunch with friends">
+      <button class="mv" id="exGo" style="margin-top:16px;width:100%;padding:14px;font-size:15px">Add expense</button>
+    </div>
+  </div><div class="col">
+    <div class="card"><div class="goalhead"><span>Spent this month</span><span class="pct" id="rTot">$0</span></div><div id="rList"><div class="sub">No spending yet.</div></div></div>
+  </div></div>
+</section>
+</div>
+
+<form class="ask" id="ask" onsubmit="return false"><input id="inp" placeholder="Ask WEWE anything" autocomplete="off"><button class="go" id="go" type="button">Go</button></form>
+<nav id="nav">
+  <button class="on" data-s="home">Home</button><button data-s="spend">Spend</button><button data-s="wewe">WEWE</button>
+</nav>
+
+<script>
+// Robot mascot
+const botSVG=s=>`<svg class="bot" width="${s}" height="${s}" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="bg${s}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5CF2A8"/><stop offset="1" stop-color="#00C264"/></linearGradient></defs><line x1="50" y1="14" x2="50" y2="24" stroke="#06261A" stroke-width="4"/><circle class="ant" cx="50" cy="11" r="6" fill="#00E676"/><rect x="8" y="42" width="8" height="20" rx="4" fill="#06261A"/><rect x="84" y="42" width="8" height="20" rx="4" fill="#06261A"/><rect x="14" y="24" width="72" height="62" rx="26" fill="url(#bg${s})" stroke="#06261A" stroke-width="5"/><rect x="26" y="40" width="48" height="24" rx="12" fill="#06261A"/><circle class="eye" cx="40" cy="52" r="5" fill="#00E676"/><circle class="eye" cx="60" cy="52" r="5" fill="#00E676"/><path d="M38 72 Q50 80 62 72" stroke="#06261A" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`;
+document.querySelectorAll('[data-bot]').forEach(e=>e.innerHTML=botSVG(+e.dataset.bot));
+
+const $=s=>document.querySelector(s);
+const API='http://127.0.0.1:8000', DEMO={email:'demo@webanki.app',password:'Demo12345'};
+let TOKEN=null,D=null,BAL=0;
+const usd=c=>'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2});
+const fd=d=>d?new Date(d+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
+const day=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2600)}
+function count(el,to,d=1400){const dec=!Number.isInteger(to),t0=performance.now();(function f(t){const p=Math.min((t-t0)/d,1),v=to*(1-Math.pow(1-p,4));el.textContent='$'+v.toLocaleString('en-US',{minimumFractionDigits:dec?2:0,maximumFractionDigits:dec?2:0});if(p<1)requestAnimationFrame(f)})(t0)}
+
+/* ===== API layer (her FastAPI backend) ===== */
+async function api(path,opt={}){
+  const r=await fetch(API+path,{...opt,headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:'Request failed');return j}
+const post=(p,b)=>api(p,{method:'POST',body:b?JSON.stringify(b):undefined});
+async function login(){
+  try{TOKEN=(await post('/auth/login',DEMO)).token}
+  catch(e){ // first run: create the demo user and seed buckets
+    TOKEN=(await post('/auth/register',{name:'Alex',...DEMO,balance:100000,salary:320000,weekly_limit:20000,savings_pct:20})).token;
+    await post('/me/buckets',{kind:'rent',name:'Rent',amount_due:95000,due_date:day(5)});
+    await post('/me/buckets',{kind:'bills',name:'Bills',amount_due:34000,due_date:day(2)});
+    await post('/me/buckets',{kind:'tuition',name:'Tuition',amount_due:120000,due_date:day(90)});
+    await post('/me/buckets',{kind:'savings',name:'New laptop',amount_due:150000});
+  }}
+
+/* ===== Render ===== */
+const COL=['#0A7A4B','#12B76A','#00E676','#5CF2A8','#B8FFD9'];
+function setCard(id,cents,sub,pct){const e=$('#'+id);e.querySelector('.amt').dataset.n=cents/100;e.querySelector('.sub').textContent=sub;e.querySelector('.fill').dataset.w=Math.max(0,Math.min(100,pct))}
+function runSplit(){document.querySelectorAll('#seg i').forEach(s=>{s.style.width='0';requestAnimationFrame(()=>requestAnimationFrame(()=>s.style.width=s.dataset.w+'%'))})}
+function playHome(){
+  count($('#bal'),BAL,1600);
+  document.querySelectorAll('.amt[data-n]').forEach(e=>count(e,+e.dataset.n,1200));
+  document.querySelectorAll('.fill').forEach(f=>{f.style.width='0';requestAnimationFrame(()=>requestAnimationFrame(()=>f.style.width=(f.dataset.w||0)+'%'))});
+  runSplit();
+}
+async function load(){
+  D=await api('/me/dashboard');
+  BAL=D.balance/100;
+  $('#nm').textContent=D.name;$('#sal').textContent=usd(D.salary);$('#tip').textContent=D.wewe_tip;
+  const t=new Date(),nx=new Date(t.getFullYear(),t.getMonth()+1,1);$('#pay').textContent='Payday in '+Math.ceil((nx-t)/864e5)+' days';
+  const by=k=>D.buckets.filter(b=>b.kind===k);
+  const agg=k=>{const l=by(k);return{due:l.reduce((s,b)=>s+b.amount_due,0),saved:l.reduce((s,b)=>s+b.saved,0),date:l.map(b=>b.due_date).filter(Boolean).sort()[0]}};
+  for(const [id,k] of [['k-bills','bills'],['k-rent','rent'],['k-tuition','tuition']]){const a=agg(k);setCard(id,a.due,(k==='tuition'?'Next term ':'Due ')+fd(a.date),a.due?a.saved/a.due*100:0)}
+  const w=D.weekly;setCard('k-week',w.left??0,'Left this week',w.limit?(w.left/w.limit)*100:0);
+  const sv=by('savings')[0];
+  if(sv){const p=sv.amount_due?Math.round(sv.saved/sv.amount_due*100):0;$('#goalT').textContent='Savings goal: '+sv.name;$('#goalP').textContent=p+'%';$('#goalF').dataset.w=p;$('#goalS').textContent=usd(sv.saved)+' saved of '+usd(sv.amount_due)}
+  const parts=[['Rent',agg('rent').saved],['Bills',agg('bills').saved],['Tuition',agg('tuition').saved],['Savings',agg('savings').saved],['Free to spend',Math.max(D.safe_to_spend,0)]];
+  const tot=parts.reduce((s,p)=>s+p[1],0)||1;
+  $('#planTotal').textContent=usd(D.balance);
+  $('#seg').innerHTML=parts.map((p,i)=>`<i style="background:${COL[i]}" data-w="${p[1]/tot*100}"></i>`).join('');
+  $('#legend').innerHTML=parts.map((p,i)=>`<div class="lg"><span><span class="dot" style="background:${COL[i]}"></span>${p[0]}</span><b>${usd(p[1])}</b></div>`).join('');
+  $('#hello').textContent=`Hi ${D.name}! You can safely spend ${usd(D.safe_to_spend)} this month.`;
+  $('#mv').textContent=nextDue()?('Pay '+nextDue().name):'All paid';
+  playHome();
+}
+const nextDue=()=>D&&D.buckets.filter(b=>b.kind!=='savings'&&b.due_date).sort((a,b)=>a.due_date<b.due_date?-1:1)[0];
+
+/* ===== Tabs + actions ===== */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===id));
+  $('#ask').classList.toggle('on',id==='wewe');window.scrollTo({top:0});if(id==='home'&&D)playHome();if(id==='spend')loadReport().catch(()=>{});
+}
+$('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(b.dataset.s)});
+document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>toast(b.dataset.t));
+document.querySelectorAll('.tg').forEach(t=>t.onclick=()=>t.classList.toggle('on'));
+$('#mv').onclick=async()=>{const b=nextDue();if(!b)return;try{const r=await post(`/me/buckets/${b.id}/pay`);toast(`Paid ${r.paid}: ${usd(r.amount)} ✓`);await load()}catch(e){toast(e.message)}};
+$('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary ${usd(r.salary_added)} added and split ✓`);await load()}catch(e){toast(e.message)}};
+
+/* ===== WEWE chat: maps questions to her endpoints ===== */
+async function askWewe(text){
+  const q=text.toLowerCase();
+  if(/\b(plan|list|show|what|all)\b/.test(q)&&/bill/.test(q)){const d=await api('/me/dashboard'),l=d.buckets.filter(b=>b.kind!=='savings');
+    return l.length?l.map(b=>`${b.name}: ${usd(b.saved)} of ${usd(b.amount_due)} set aside, due ${fd(b.due_date)}`).join('. ')+'.':'You have no bills yet.'}
+  if(/bill|remind/.test(q)){const r=(await api('/me/reminders')).reminders;
+    return r.length?r.map(x=>`${x.name} is due in ${x.days_left} days and still needs ${usd(x.still_needed)}`).join('. ')+'.':'No bills are due in the next 3 days. You’re all set.'}
+  if(/report|spending/.test(q)){const r=await api('/me/report'),k=Object.entries(r.by_category);
+    return k.length?`This month you spent ${usd(r.total)}: `+k.map(([c,v])=>`${c} ${usd(v)}`).join(', ')+'.':'No spending yet this month.'}
+  if(/split|salary|payday/.test(q)){const r=await post('/me/payday');await load();
+    return `Added ${usd(r.salary_added)}. I set aside `+r.plan.map(p=>`${usd(p.set_aside)} for ${p.bucket}`).join(', ')+'.'}
+  if(/limit/.test(q)){const d=await api('/me/dashboard'),w=d.weekly;return w.limit?`Your weekly limit is ${usd(w.limit)} and you have ${usd(w.left)} left.`:'You have no weekly limit set yet.'}
+  if(/saving/.test(q)){const d=await api('/me/dashboard'),s=d.buckets.find(b=>b.kind==='savings');return s?`You’ve saved ${usd(s.saved)} of ${usd(s.amount_due)} for ${s.name}. Keep going!`:'You have no savings goal yet.'}
+  if(/afford|buy|can i/.test(q)){const m=q.match(/(\d+(?:\.\d{1,2})?)/);
+    if(!m)return 'Tell me the price, like “Can I afford $60?”';
+    return (await api('/me/afford?amount='+Math.round(m[1]*100))).message}
+  return (await api('/me/dashboard')).wewe_tip;
+}
+const msgs=$('#msgs');
+function bubble(cls,html=''){const d=document.createElement('div');d.className='m '+cls;d.innerHTML=html;msgs.appendChild(d);d.scrollIntoView({block:'center',behavior:'smooth'});return d}
+async function send(text){
+  text=text.trim();if(!text)return;
+  $('#inp').value='';$('#chips').style.display='none';
+  bubble('u').textContent=text;
+  const w=bubble('w','<div class="dots"><i></i><i></i><i></i></div>');
+  let reply;try{reply=await askWewe(text)}catch(e){reply='I couldn’t reach the server. Is the backend running?'}
+  w.textContent='';
+  for(const ch of reply){w.textContent+=ch;await new Promise(r=>setTimeout(r,14))}
+  w.scrollIntoView({block:'center'});
+}
+$('#go').onclick=()=>send($('#inp').value);
+$('#inp').addEventListener('keydown',e=>{if(e.key==='Enter')send(e.target.value)});
+$('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(c)send(c.dataset.q)});
+$('#rep').onclick=()=>{show('wewe');send('Show my spending report')};
+async function loadReport(){
+  const r=await api('/me/report'),k=Object.entries(r.by_category),nm={weekly:'Daily life'};
+  $('#rTot').textContent=usd(r.total);
+  $('#rList').innerHTML=k.length?k.map(([c,v])=>`<div class="lg"><span>${nm[c]||c[0].toUpperCase()+c.slice(1)}</span><b>${usd(v)}</b></div>`).join(''):'<div class="sub">No spending yet.</div>';
+}
+$('#exGo').onclick=async()=>{const v=parseFloat($('#exA').value);if(!(v>0))return toast('Enter an amount first');
+  try{const r=await post('/me/expenses',{amount:Math.round(v*100),category:$('#exC').value,note:$('#exN').value});
+    toast(r.round_up_saved?`Added. WEWE saved ${usd(r.round_up_saved)} from the round-up ✓`:'Expense added ✓');
+    if(r.warning)setTimeout(()=>toast(r.warning),2800);
+    $('#exA').value='';$('#exN').value='';await load();await loadReport()}catch(e){toast(e.message)}};
+(async()=>{try{await login();await load()}catch(e){toast('Can’t reach the backend. Start it, then refresh.')}})();
+</script>
+</body>
+</html>
