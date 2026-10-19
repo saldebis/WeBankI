@@ -429,20 +429,43 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
 
     try:
         import urllib.request, json as _json
-        if provider == "watsonx":
-            # IBM watsonx.ai chat completions endpoint (OpenAI-compatible)
-            url = base_url or "https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2024-05-13"
+        if provider == "gemini":
+            # Google Gemini API
+            gemini_model = model or "gemini-2.0-flash"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+            # Convert messages to Gemini format (system prompt becomes first user/model exchange)
+            contents = []
+            for msg in messages:
+                if msg["role"] == "system":
+                    contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
+                    contents.append({"role": "model", "parts": [{"text": "Understood. I am WEWE, ready to help."}]})
+                elif msg["role"] == "user":
+                    contents.append({"role": "user", "parts": [{"text": msg["content"]}]})
+                elif msg["role"] == "assistant":
+                    contents.append({"role": "model", "parts": [{"text": msg["content"]}]})
+            payload = _json.dumps({
+                "contents": contents,
+                "generationConfig": {"maxOutputTokens": 200, "temperature": 0.4}
+            }).encode()
+            req = urllib.request.Request(url, data=payload,
+                                         headers={"Content-Type": "application/json"},
+                                         method="POST")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = _json.loads(resp.read())
+            reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         else:
-            url = (base_url.rstrip("/") + "/chat/completions") if base_url else "https://api.openai.com/v1/chat/completions"
-
-        payload = _json.dumps({"model": model, "messages": messages, "max_tokens": 200, "temperature": 0.4}).encode()
-        req = urllib.request.Request(url, data=payload,
-                                     headers={"Content-Type": "application/json",
-                                              "Authorization": f"Bearer {api_key}"},
-                                     method="POST")
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            data = _json.loads(resp.read())
-        reply = data["choices"][0]["message"]["content"].strip()
+            if provider == "watsonx":
+                url = base_url or "https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2024-05-13"
+            else:
+                url = (base_url.rstrip("/") + "/chat/completions") if base_url else "https://api.openai.com/v1/chat/completions"
+            payload = _json.dumps({"model": model, "messages": messages, "max_tokens": 200, "temperature": 0.4}).encode()
+            req = urllib.request.Request(url, data=payload,
+                                         headers={"Content-Type": "application/json",
+                                                  "Authorization": f"Bearer {api_key}"},
+                                         method="POST")
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = _json.loads(resp.read())
+            reply = data["choices"][0]["message"]["content"].strip()
         return {"reply": reply, "source": "llm"}
     except Exception:
         return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
