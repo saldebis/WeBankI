@@ -401,7 +401,7 @@ document.querySelectorAll('[data-bot]').forEach(e=>e.innerHTML=botSVG(+e.dataset
 
 const $=s=>document.querySelector(s);
 
-const API='http://127.0.0.1:8000';
+const API='https://webanki.vercel.app';
 let TOKEN=sessionStorage.getItem('webanki-token'),D=null,BAL=0;
 let chatHistory = [];
 let authMode='login';
