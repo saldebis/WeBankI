@@ -11,7 +11,9 @@ from pydantic import BaseModel, Field
 # Vercel's serverless filesystem is read-only except for /tmp.
 # Set WEBANKI_DB env var in the Vercel dashboard to a persistent store path,
 # or leave it as /tmp/webanki.db for ephemeral (resets on cold start).
-DB = os.environ.get("WEBANKI_DB", os.path.join(os.path.dirname(__file__), "webanki.db"))
+# Use /tmp on Vercel (Linux); fall back to a local file on Windows dev machines
+_default_db = "/tmp/webanki.db" if os.name != "nt" else os.path.join(os.path.dirname(__file__), "webanki.db")
+DB = os.environ.get("WEBANKI_DB", _default_db)
 SECRET = os.environ.get("WEBANKI_SECRET", "dev-secret-change-me")  # set a real one when deployed
 app = FastAPI(title="WEBANKI API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

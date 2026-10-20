@@ -4,3 +4,4 @@ pydantic
 pyjwt
 httpx
 python-multipart
+python-dotenv
