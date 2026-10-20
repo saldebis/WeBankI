@@ -204,7 +204,7 @@ The demonstration will showcase the user interface, account workflow, budgeting 
 
 ## 📊 Project Presentation
 
-**Presentation Slides:**  https://www.ilovepdf.com/download/376z1t314nvcc1q0hgvplhb18284vc6xy2rcn95pl6lzv2mylmxb1kyqlxx5781zbcfvd71r7cr0hyls4hynw1mj4swxv7f9b93wAr75xp2r2hA3z0yzqAnmv502mfgryv4w4f56nlk9682bmbbp9pApvlhdyjt00yfrs8Axv05njAwyl3t1/102
+**Presentation Slides:**  https://drive.google.com/file/d/1VnlIfgagM38XqRZpJdzIg5WE7HckYYbh/view?usp=sharing
 
 
 ---
