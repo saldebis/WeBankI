@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WEBANKI</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+  const initialTheme=localStorage.getItem('webanki-theme');
+  if(initialTheme==='light'||initialTheme==='dark')document.documentElement.dataset.theme=initialTheme;
+</script>
 <style>
 :root{
   --bg:#EAF8F0;--card:#F7FEFA;--line:#CDEEDD;--text:#06261A;--muted:#4C6E5F;
@@ -24,6 +28,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk'
 header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .logo{font-size:28px;font-weight:700;letter-spacing:-.5px;background:linear-gradient(90deg,var(--g3),var(--g1));-webkit-background-clip:text;background-clip:text;color:transparent}
 .hi{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:15px}
+.theme-buttons{display:flex;gap:3px;padding:3px;background:var(--card);border:1px solid var(--line);border-radius:99px}
+.theme-buttons button{border:0;border-radius:99px;padding:6px 8px;font:inherit;font-size:11px;color:var(--muted);background:transparent;cursor:pointer}
+.theme-buttons button.active{color:#03170F;background:linear-gradient(90deg,#5CF2A8,#00E676)}
 .bot{display:block}.bot .eye{transform-origin:center;animation:blink 4.5s infinite}
 @keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
 .bot .ant{animation:pulse 2s infinite}@keyframes pulse{50%{opacity:.35}}
@@ -125,7 +132,11 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
 <section class="screen on" id="home">
   <header>
     <div class="logo">WEBANKI</div>
-    <div class="hi">Hi, <span id="nm">Alex</span> <span data-bot="40"></span></div>
+    <div class="hi"><div class="theme-buttons" aria-label="Color theme">
+      <button type="button" data-theme-choice="system">System</button>
+      <button type="button" data-theme-choice="light">Light</button>
+      <button type="button" data-theme-choice="dark">Dark</button>
+    </div>Hi, <span id="nm">Alex</span> <span data-bot="40"></span></div>
   </header>
   <div class="cols"><div class="col">
   <div class="bal">
@@ -324,6 +335,23 @@ function show(id){
   $('#ask').classList.toggle('on',id==='wewe');window.scrollTo({top:0});if(id==='home'&&D)playHome();if(id==='spend')loadReport().catch(()=>{});
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(b.dataset.s)});
+const themeButtons=document.querySelectorAll('[data-theme-choice]');
+function setTheme(theme){
+  if(theme==='system'){
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.removeItem('webanki-theme');
+  }else{
+    document.documentElement.dataset.theme=theme;
+    localStorage.setItem('webanki-theme',theme);
+  }
+  themeButtons.forEach(button=>{
+    const active=button.dataset.themeChoice===theme;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',active);
+  });
+}
+setTheme(localStorage.getItem('webanki-theme')||'system');
+themeButtons.forEach(button=>button.onclick=()=>setTheme(button.dataset.themeChoice));
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>toast(b.dataset.t));
 document.querySelectorAll('.tg').forEach(t=>t.onclick=()=>t.classList.toggle('on'));
 $('#mv').onclick=async()=>{const b=nextDue();if(!b)return;try{const r=await post(`/me/buckets/${b.id}/pay`);toast(`Paid ${r.paid}: ${usd(r.amount)} ✓`);await load()}catch(e){toast(e.message)}};
