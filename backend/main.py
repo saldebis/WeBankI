@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 # Vercel's serverless filesystem is read-only except for /tmp.
 # Set WEBANKI_DB env var in the Vercel dashboard to a persistent store path,
 # or leave it as /tmp/webanki.db for ephemeral (resets on cold start).
-DB = os.environ.get("WEBANKI_DB", "/tmp/webanki.db")
+DB = os.environ.get("WEBANKI_DB", os.path.join(os.path.dirname(__file__), "webanki.db"))
 SECRET = os.environ.get("WEBANKI_SECRET", "dev-secret-change-me")  # set a real one when deployed
 app = FastAPI(title="WEBANKI API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -441,13 +441,13 @@ _RATE_MAX = 20
 _RATE_WINDOW = 3600  # seconds
 
 def _check_rate(uid: int):
-    now = _time.monotonic()
+    now_ts = _time.monotonic()
     q = _rate.setdefault(uid, collections.deque())
-    while q and now - q[0] > _RATE_WINDOW:
+    while q and now_ts - q[0] > _RATE_WINDOW:
         q.popleft()
     if len(q) >= _RATE_MAX:
         raise HTTPException(429, "Rate limit: max 20 WEWE messages per hour")
-    q.append(now)
+    q.append(now_ts)
 
 def _financial_snapshot(uid: int) -> str:
     """Build a dollar-formatted snapshot for the LLM. Never includes credentials."""
@@ -490,7 +490,7 @@ def _financial_snapshot(uid: int) -> str:
 _SYSTEM_PROMPT = """You are WEWE, a friendly green robot money assistant for the WEBANKI app.
 
 Rules:
-- You have access to the user's real financial snapshot. Use it to answer financial questions accurately.
+- You have access to the user's real financial snapshot. Use it to answer financial questions accurately. Never invent numbers.
 - For arithmetic (e.g. "888-99", "what is 4400 minus 500"), compute the result and show it clearly.
 - For savings timeline questions (e.g. "how many months to save for X?"):
     1. If the goal amount and monthly savings are known from the snapshot or conversation, calculate: months = ceil((goal - already_saved) / monthly_savings).
@@ -502,10 +502,11 @@ Rules:
 - Keep answers concise (under 120 words). If a calculation requires more steps, show the working briefly.
 - Answer in the user's language (English or Arabic).
 - You may answer brief general conversation, then guide back to budgeting.
-- This is a simulated app. Never claim to move real money or give professional financial advice."""
+- This is a simulated app. Never claim to move real money or give professional financial advice.
+- For action requests (add expense, send money, set limit), tell the user to use the relevant button in the app — you cannot perform actions yourself."""
 
 def _rule_based_reply(uid: int, text: str) -> str:
-    """Fallback when LLM is unavailable. Never returns an unrelated financial warning."""
+    """Fallback when LLM is unavailable. Returns a relevant answer based on the query."""
     import re as _re
     q = text.lower().strip()
 
@@ -515,14 +516,13 @@ def _rule_based_reply(uid: int, text: str) -> str:
     m = _re.fullmatch(r'\s*[\d\s\+\-\*\/\.\(\)]+\s*', arith)
     if m:
         try:
-            # Safe arithmetic: only digits and operators, no names/functions
             result = eval(compile(arith.strip(), '<string>', 'eval'),  # noqa: S307
                           {"__builtins__": {}}, {})
             return f"{arith.strip()} = {result:g}"
         except Exception:
             pass
 
-    # Ambiguous / too short
+    # Too short
     if len(q) <= 2:
         return "I didn't catch that 😊 Could you tell me more? For example: \"Can I afford $50?\" or \"Show my bills\"."
 
@@ -558,7 +558,6 @@ def _rule_based_reply(uid: int, text: str) -> str:
         if u["weekly_limit"] and weekly_left is not None:
             return f"Your weekly limit is ${u['weekly_limit']/100:.2f} and you have ${weekly_left/100:.2f} left."
         return "You have no weekly limit set yet."
-    # Generic fallback: show safe-to-spend, not a hardcoded warning
     tip = wewe_tip(buckets, safe, weekly_left)
     return f"{tip} Ask me anything about your money!"
 
@@ -568,14 +567,13 @@ class ChatIn(BaseModel):
 
 @app.post("/me/wewe/chat")
 def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
-    """LLM-powered WEWE chat. Falls back to rule-based reply if LLM is unavailable."""
+    """OpenAI-powered WEWE chat. Falls back to rule-based reply if API key is not set."""
     _check_rate(uid)
     snapshot = _financial_snapshot(uid)
 
-    provider = os.environ.get("LLM_PROVIDER", "openai").lower()
-    api_key = os.environ.get("LLM_API_KEY", "")
-    model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
-    base_url = os.environ.get("LLM_BASE_URL", "")
+    # Read the standard OpenAI env var; also accept the legacy LLM_API_KEY for backwards compat
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LLM_API_KEY", "")
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
     if not api_key:
         return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
@@ -587,53 +585,48 @@ def wewe_chat(b: ChatIn, uid: int = Depends(current_uid)):
             turns.append({"role": h["role"], "content": str(h.get("content", ""))})
     turns.append({"role": "user", "content": b.message})
 
-    system_content = _SYSTEM_PROMPT + "\n\nCurrent financial snapshot:\n" + snapshot
+    # Cap history to last 20 turns to avoid hitting token limits
+    if len(turns) > 21:
+        turns = turns[-21:]
+
+    system_content = _SYSTEM_PROMPT + "\n\nCurrent financial snapshot (today's live data):\n" + snapshot
+
+    messages = [{"role": "system", "content": system_content}] + turns
 
     try:
         import urllib.request, json as _json, urllib.error as _ue
-        if provider == "gemini":
-            # Strip any accidental "models/" prefix — the URL already includes it
-            raw_model = (model or "gemini-1.5-flash").strip()
-            gemini_model = raw_model.removeprefix("models/")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
-            # Use systemInstruction (native Gemini field) — avoids injecting system as a fake user turn
-            contents = []
-            for t in turns:
-                role = "model" if t["role"] == "assistant" else "user"
-                contents.append({"role": role, "parts": [{"text": t["content"]}]})
-            payload = _json.dumps({
-                "systemInstruction": {"parts": [{"text": system_content}]},
-                "contents": contents,
-                "generationConfig": {"maxOutputTokens": 400, "temperature": 0.5}
-            }).encode()
-            req = urllib.request.Request(url, data=payload,
-                                         headers={"Content-Type": "application/json"},
-                                         method="POST")
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                data = _json.loads(resp.read())
-            reply = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        else:
-            messages = [{"role": "system", "content": system_content}] + [
-                {"role": t["role"], "content": t["content"]} for t in turns
-            ]
-            if provider == "watsonx":
-                url = base_url or "https://us-south.ml.cloud.ibm.com/ml/v1/text/chat?version=2024-05-13"
-            else:
-                url = (base_url.rstrip("/") + "/chat/completions") if base_url else "https://api.openai.com/v1/chat/completions"
-            payload = _json.dumps({"model": model, "messages": messages, "max_tokens": 400, "temperature": 0.5}).encode()
-            req = urllib.request.Request(url, data=payload,
-                                         headers={"Content-Type": "application/json",
-                                                  "Authorization": f"Bearer {api_key}"},
-                                         method="POST")
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                data = _json.loads(resp.read())
-            reply = data["choices"][0]["message"]["content"].strip()
+        payload = _json.dumps({
+            "model": model,
+            "messages": messages,
+            "max_tokens": 400,
+            "temperature": 0.4,
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = _json.loads(resp.read())
+        reply = data["choices"][0]["message"]["content"].strip()
         return {"reply": reply, "source": "llm"}
     except _ue.HTTPError as e:
+        err_detail = ""
         try:
-            err = _json.loads(e.read()).get("error", {}).get("message", str(e))
+            err_detail = _json.loads(e.read()).get("error", {}).get("message", "")
         except Exception:
-            err = str(e)
-        return {"reply": f"⚠️ AI unavailable: {err}", "source": "error"}
-    except Exception as ex:
-        return {"reply": f"⚠️ AI unavailable: {ex}", "source": "error"}
+            pass
+        # Surface a user-friendly message without leaking API internals
+        if e.code == 401:
+            return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
+        if e.code == 429:
+            return {"reply": "I'm getting a lot of questions right now — please wait a moment and try again.", "source": "error"}
+        if err_detail:
+            return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
+        return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}
+    except Exception:
+        return {"reply": _rule_based_reply(uid, b.message), "source": "fallback"}

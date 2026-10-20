@@ -170,9 +170,9 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
   </div>
   <div class="chips" id="chips">
     <button class="chip" data-q="Can I afford $60 this week?">Can I afford something?</button>
-    <button class="chip" data-q="Set weekly limit">Set weekly limit</button>
-    <button class="chip" data-q="Plan my savings">Plan my savings</button>
-    <button class="chip" data-q="Analyse my bills">Analyse my bills</button>
+    <button class="chip" data-q="What is my weekly spending limit?">Weekly limit</button>
+    <button class="chip" data-q="How am I doing on my savings goal?">My savings goal</button>
+    <button class="chip" data-q="What bills are coming up?">Upcoming bills</button>
     <button class="chip" data-q="Split my salary">Split my salary</button>
   </div>
   </div><div class="col"><h3>Smart features</h3>
@@ -334,62 +334,17 @@ $('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary
 async function askWewe(text){
   const q = text.toLowerCase();
 
-  if(/\b(plan|list|show|what|all)\b/.test(q) && /bill/.test(q)){
-    const d = await api('/me/dashboard');
-    const l = d.buckets.filter(b => b.kind !== 'savings');
-    return l.length
-      ? l.map(b => `${b.name}: ${usd(b.saved)} of ${usd(b.amount_due)} set aside, due ${fd(b.due_date)}`).join('. ') + '.'
-      : 'You have no bills yet.';
-  }
-
-  if(/bill|remind/.test(q)){
-    const r = (await api('/me/reminders')).reminders;
-    return r.length
-      ? r.map(x => `${x.name} is due in ${x.days_left} days and still needs ${usd(x.still_needed)}`).join('. ') + '.'
-      : "No bills are due in the next 3 days. You're all set.";
-  }
-
-  if(/report|spending/.test(q)){
-    const r = await api('/me/report');
-    const k = Object.entries(r.by_category);
-    return k.length
-      ? `This month you spent ${usd(r.total)}: ` + k.map(([c,v]) => `${c} ${usd(v)}`).join(', ') + '.'
-      : 'No spending yet this month.';
-  }
-
-  if(/split|salary|payday/.test(q)){
+  // Only intercept explicit action commands (payday/split salary) — everything
+  // else goes to the LLM so it has full context and can answer follow-ups.
+  if(/\b(split my salary|run payday|add my salary)\b/.test(q)){
     const r = await post('/me/payday');
     await load();
     return `Added ${usd(r.salary_added)}. I set aside ` + r.plan.map(p => `${usd(p.set_aside)} for ${p.bucket}`).join(', ') + '.';
   }
 
-  if(/limit/.test(q)){
-    const d = await api('/me/dashboard');
-    const w = d.weekly;
-    return w.limit
-      ? `Your weekly limit is ${usd(w.limit)} and you have ${usd(w.left)} left.`
-      : 'You have no weekly limit set yet.';
-  }
-
-  if(/saving|save for|put aside/.test(q)){
-    const d = await api('/me/dashboard');
-    const s = d.buckets.find(b => b.kind === 'savings');
-    return s
-      ? `You've saved ${usd(s.saved)} of ${usd(s.amount_due)} for ${s.name}. Keep going!`
-      : 'You have no savings goal yet.';
-  }
-
-  if(/afford|buy|can i/.test(q)){
-    const m = q.match(/\$?([\d,]+(?:\.\d{1,2})?)([km]?)/i);
-    if(!m) return 'Tell me the price, like "Can I afford $60?"';
-
-    let amt = parseFloat(m[1].replace(/,/g,''));
-    if(m[2].toLowerCase() === 'k') amt *= 1000;
-    if(m[2].toLowerCase() === 'm') amt *= 1000000;
-
-    return (await api('/me/afford?amount=' + Math.round(amt * 100))).message;
-  }
-
+  // All other questions — including bills, savings, affordability, spending
+  // reports, weekly limits, and follow-ups — go to the backend LLM endpoint.
+  // Pass the full conversation history so WEWE can maintain context.
   const result = await post('/me/wewe/chat', {
     message: text,
     history: chatHistory.slice(0, -1)
