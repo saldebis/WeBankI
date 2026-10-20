@@ -204,7 +204,7 @@ The demonstration will showcase the user interface, account workflow, budgeting 
 
 ## 📊 Project Presentation
 
-**Presentation Slides:**  
+**Presentation Slides:**  file:///C:/Users/salma/Downloads/Screenshot%202026-10-20%20210123.pdf
 
 
 ---
