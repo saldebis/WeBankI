@@ -203,7 +203,10 @@ body.authenticated #authScreen {
   </header>
   <div class="cols"><div class="col">
   <div class="bal">
-    <div class="lbl">Current balance</div>
+    <div class="lbl" style="display:flex;justify-content:space-between;align-items:center">
+      Current balance
+      <button id="btnUpdateBal" title="Update balance" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:99px;padding:4px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.2px">Edit</button>
+    </div>
     <div class="big" id="bal">$0</div>
     <div class="row"><div><div class="lbl">Monthly salary</div><div class="sal" id="sal">$0</div></div><div class="pill" id="pay">Payday soon</div></div>
   </div>
@@ -389,6 +392,20 @@ body.authenticated #authScreen {
       <button class="mv" onclick="closeModal('modalSplitBill')" style="flex:1;padding:13px;background:var(--line);color:var(--text)">Cancel</button>
     </div>
     <div id="spOwed" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- UPDATE BALANCE MODAL -->
+<div id="modalUpdateBal" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:24px;width:min(360px,90vw)">
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">Update balance</div>
+    <div style="font-size:14px;color:var(--muted);margin-bottom:16px">Set your current account balance.</div>
+    <div class="k">New balance ($)</div>
+    <input class="fld" id="updBalAmt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="1500.00">
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="mv" id="updBalGo" style="flex:1;padding:13px">Update</button>
+      <button class="mv" onclick="closeModal('modalUpdateBal')" style="flex:1;padding:13px;background:var(--line);color:var(--text)">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -811,6 +828,17 @@ function openModal(id){const m=$('#'+id);m.style.display='flex'}
 function closeModal(id){const m=$('#'+id);m.style.display='none'}
 
 /* --- Send --- */
+$('#btnUpdateBal').onclick=()=>{$('#updBalAmt').value='';openModal('modalUpdateBal')};
+$('#updBalGo').onclick=async()=>{
+  const v=parseFloat($('#updBalAmt').value);
+  if(!(v>=0))return toast('Enter a valid amount');
+  try{
+    await api('/me/balance',{method:'PATCH',body:JSON.stringify({balance:Math.round(v*100)})});
+    toast(`Balance updated to ${usd(Math.round(v*100))} ✓`);
+    closeModal('modalUpdateBal');
+    await load();
+  }catch(e){toast(e.message)}};
+
 $('#btnSend').onclick=()=>openModal('modalSend');
 $('#sndGo').onclick=async()=>{
   const email=$('#sndEmail').value.trim(),v=parseFloat($('#sndAmt').value),note=$('#sndNote').value;

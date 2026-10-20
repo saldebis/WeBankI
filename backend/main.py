@@ -384,6 +384,16 @@ def set_weekly_limit(b: WeeklyLimitIn, uid: int = Depends(current_uid)):
         c.execute("UPDATE users SET weekly_limit=? WHERE id=?", (b.weekly_limit, uid))
     return {"weekly_limit": b.weekly_limit}
 
+class BalanceIn(BaseModel):
+    balance: int = Field(..., ge=0, description="new balance in cents")
+
+@app.patch("/me/balance")
+def update_balance(b: BalanceIn, uid: int = Depends(current_uid)):
+    """Directly set the user's balance (e.g. after a top-up or correction)."""
+    with db() as c:
+        c.execute("UPDATE users SET balance=? WHERE id=?", (b.balance, uid))
+    return {"balance": b.balance}
+
 @app.get("/me/analyse-bills")
 def analyse_bills(uid: int = Depends(current_uid)):
     """For every bill/rent/tuition bucket: what is due, what is funded, what is still needed."""
