@@ -205,7 +205,7 @@ The demonstration will showcase the user interface, account workflow, budgeting 
 ## 📊 Project Presentation
 
 **Presentation Slides:**  
-Screenshot 2026-10-20 210123.pdf
+
 
 ---
 
