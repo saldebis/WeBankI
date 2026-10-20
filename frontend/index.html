@@ -9,6 +9,7 @@
   const initialTheme=localStorage.getItem('webanki-theme');
   if(initialTheme==='light'||initialTheme==='dark')document.documentElement.dataset.theme=initialTheme;
 </script>
+
 <style>
 :root{
   --bg:#EAF8F0;--card:#F7FEFA;--line:#CDEEDD;--text:#06261A;--muted:#4C6E5F;
@@ -31,6 +32,9 @@ header{display:flex;justify-content:space-between;align-items:center;margin-bott
 .theme-buttons{display:flex;gap:3px;padding:3px;background:var(--card);border:1px solid var(--line);border-radius:99px}
 .theme-buttons button{border:0;border-radius:99px;padding:6px 8px;font:inherit;font-size:11px;color:var(--muted);background:transparent;cursor:pointer}
 .theme-buttons button.active{color:#03170F;background:linear-gradient(90deg,#5CF2A8,#00E676)}
+.mv:hover{filter:brightness(1.05)}
+.mv:focus-visible,.btn:focus-visible,.theme-buttons button:focus-visible,.chip:focus-visible,.go:focus-visible,.tg:focus-visible,nav button:focus-visible{outline:3px solid var(--g1);outline-offset:2px}
+.mv:disabled{cursor:wait;opacity:.65;filter:none}
 .bot{display:block}.bot .eye{transform-origin:center;animation:blink 4.5s infinite}
 @keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
 .bot .ant{animation:pulse 2s infinite}@keyframes pulse{50%{opacity:.35}}
@@ -96,7 +100,7 @@ h3{font-size:16px;color:var(--muted);font-weight:500;margin:6px 0 10px}
 .ask input:focus{border-color:var(--g1);box-shadow:0 0 0 3px rgba(0,230,118,.25)}
 .go{border:0;font:inherit;font-weight:700;color:#03170F;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#5CF2A8,#00E676);cursor:pointer;box-shadow:0 8px 20px -6px rgba(0,230,118,.7)}
 nav{max-width:430px;margin:0 auto;display:flex;justify-content:space-around;background:var(--bg);border-top:1px solid var(--line);padding:14px 6px;z-index:5}
-nav button{font:inherit;font-size:15px;background:none;border:0;color:var(--muted);cursor:pointer;position:relative;padding:4px 6px}
+nav button{font:inherit;font-size:13px;background:none;border:0;color:var(--muted);cursor:pointer;position:relative;padding:4px 6px;white-space:nowrap}
 nav button.on{color:var(--text);font-weight:700}
 nav button.on::after{content:"";position:absolute;left:25%;right:25%;bottom:-8px;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--g2),var(--g1))}
 .seg{display:flex;gap:3px;height:16px;border-radius:9px;overflow:hidden;background:var(--line);margin-bottom:6px}.seg i{display:block;width:0;transition:width 1.3s cubic-bezier(.2,.8,.2,1)}
@@ -117,15 +121,74 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
 .toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translate(-50%,-90px);background:var(--deep);color:#8CF3BE;padding:12px 20px;border-radius:99px;font-weight:700;transition:transform .45s cubic-bezier(.3,1.4,.5,1);z-index:9;border:1px solid #12B76A}
 .toast.on{transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Show authentication first; reveal the app after login */
+body:not(.authenticated) #nav,
+body:not(.authenticated) .screen {
+  display: none !important;
+}
+
+body.authenticated #nav {
+  display: flex !important;
+}
+
+body.authenticated .screen.on {
+  display: block !important;
+}
+
+body.authenticated #authScreen {
+  display: none !important;
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="toast" id="toast"></div>
+
 <div class="app">
 
+<!-- AUTH SCREEN -->
+<section id="authScreen" style="display:block;padding:30px 0">
+  <div style="text-align:center;margin:30px 0">
+    <div class="logo">WEBANKI</div>
+    <p style="color:var(--muted)">Your money. Your control.</p>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:10px;margin-bottom:20px">
+      <button class="mv" id="showLogin" type="button" style="flex:1">Login</button>
+      <button class="mv" id="showRegister" type="button" style="flex:1;background:var(--line);color:var(--text)">Register</button>
+    </div>
+
+    <form id="authForm">
+      <div id="nameField" style="display:none">
+        <label for="authName">Full name</label>
+        <input class="fld" id="authName" autocomplete="name" placeholder="Your name">
+      </div>
+
+      <div style="margin-top:12px">
+        <label for="authEmail">Email</label>
+        <input class="fld" id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com">
+      </div>
+
+      <div style="margin-top:12px">
+        <label for="authPassword">Password</label>
+        <input class="fld" id="authPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="Enter your password">
+      </div>
+
+      <div id="salaryField" style="display:none;margin-top:12px">
+        <label for="authSalary">Monthly salary</label>
+        <input class="fld" id="authSalary" type="number" min="0.01" step="0.01" placeholder="30000">
+      </div>
+
+      <button class="mv" id="authSubmit" type="submit" style="width:100%;padding:14px;margin-top:20px">Login</button>
+      <p id="authError" role="alert" style="color:#D94848;font-size:14px"></p>
+    </form>
+  </div>
+</section>
+
 <nav id="nav">
-  <button class="on" data-s="home">Home</button><button data-s="spend">Spend</button><button data-s="wewe">WEWE</button>
+  <button class="on" data-s="home">Home</button><button data-s="bills">Bills &amp; Budgets</button><button data-s="spend">Insights</button><button data-s="wewe">WEWE</button>
 </nav>
 
 <!-- HOME -->
@@ -144,33 +207,84 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
     <div class="big" id="bal">$0</div>
     <div class="row"><div><div class="lbl">Monthly salary</div><div class="sal" id="sal">$0</div></div><div class="pill" id="pay">Payday soon</div></div>
   </div>
+  <div class="card" style="margin-top:12px">
+    <div class="goalhead"><span>Safe to spend</span><span class="pct" id="homeSafeToSpend">—</span></div>
+    <div class="sub" id="homeSafeToSpendMessage">Available after your commitments.</div>
+  </div>
   <div class="acts">
     <button class="btn" id="btnSend">Send</button>
     <button class="btn" id="btnQR">Scan to pay</button>
-    <button class="btn" id="btnSplit">Split bill</button>
+    <button class="btn" id="btnSplit">Split a payment</button>
   </div>
   <div class="card tip">
     <span data-bot="34"></span>
     <div><p><b>WEWE says:</b> <span id="tip">Loading your money plan…</span></p><button class="mv" id="mv">Pay now</button></div>
   </div>
   </div><div class="col">
+    <div class="card">
+      <div class="goalhead"><span>Upcoming bills</span><button class="mv" id="openBills" type="button">View all</button></div>
+      <div class="amt" id="homeBillsPreview">—</div>
+      <div class="sub" id="homeRemindersPreview">Bills and reminders haven't loaded yet.</div>
+    </div>
+  </div></div>
+</section>
+
+<!-- BILLS & BUDGETS -->
+<section class="screen" id="bills">
+  <div class="hero" style="padding-bottom:10px"><h2>Bills &amp; Budgets</h2><p>Stay ahead of upcoming commitments.</p></div>
   <div class="grid">
     <div class="card" id="k-bills"><div class="k">Bills</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
-    <div class="card" id="k-week"><div class="k">Daily life</div><div class="amt">$0</div><div class="sub">Left this week</div><div class="bar"><div class="fill"></div></div></div>
     <div class="card" id="k-rent"><div class="k">Rent</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
     <div class="card" id="k-tuition"><div class="k">Tuition</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-week"><div class="k">Daily life</div><div class="amt">$0</div><div class="sub">Left this week</div><div class="bar"><div class="fill"></div></div></div>
   </div>
+
+  <div class="card" id="billInsights" style="margin-bottom:12px">
+    <div class="goalhead">
+      <span>Bill Insights</span>
+      <button class="mv" id="refreshBillInsights" type="button">Refresh</button>
+    </div>
+    <div id="billInsightsStatus" class="sub" role="status" aria-live="polite" style="margin:8px 0 0"></div>
+    <div class="sub" style="margin:12px 0 6px">Still needed for bills</div>
+    <div class="amt" id="billsStillNeeded">—</div>
+    <div class="sub" style="margin:12px 0 6px">Safe to spend</div>
+    <div class="amt" id="billsSafeToSpend">—</div>
+    <div id="billsCoverage" class="sub" style="margin-top:10px" role="status">Bill affordability hasn't been checked yet.</div>
+    <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:12px">
+      <b>Upcoming reminders</b>
+      <div id="billReminderList" style="margin-top:10px"><div class="sub">Reminders haven't loaded yet.</div></div>
+    </div>
+  </div>
+
   <div class="card" style="margin-bottom:12px">
-    <div class="goalhead"><span>Where your money is</span><span class="pct" id="planTotal">$0</span></div>
-    <div class="seg" id="seg"></div><div id="legend"></div>
-    <button class="mv" id="split" style="margin-top:12px">Split my salary</button>
+    <div class="goalhead"><span>Salary allocation</span><span class="pct">Commitments</span></div>
+    <p style="color:var(--muted)">Allocate your salary to bills, rent, tuition, and savings.</p>
+    <button class="mv" id="split" style="margin-top:4px">Split my salary</button>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <h3>Create a budget bucket</h3>
+    <p style="color:var(--muted)">Organize money for upcoming needs and savings goals.</p>
+    <form id="bucketForm">
+      <label for="bucketKind">Category</label>
+      <select class="fld" id="bucketKind" required>
+        <option value="rent">Rent</option><option value="bills">Bills</option><option value="tuition">Tuition</option><option value="savings">Savings</option>
+      </select>
+      <label for="bucketName" style="display:block;margin-top:12px">Bucket name</label>
+      <input class="fld" id="bucketName" required maxlength="80" placeholder="e.g. Emergency fund">
+      <label for="bucketAmount" style="display:block;margin-top:12px">Target amount (USD)</label>
+      <input class="fld" id="bucketAmount" type="number" min="0.01" step="0.01" required placeholder="e.g. 500">
+      <label for="bucketDate" style="display:block;margin-top:12px">Due date (optional)</label>
+      <input class="fld" id="bucketDate" type="date">
+      <button class="mv" id="createBucketBtn" type="submit" style="width:100%;margin-top:16px">Create bucket</button>
+      <p id="bucketMessage" role="status"></p>
+    </form>
   </div>
   <div class="card">
-    <div class="goalhead"><span id="goalT">Savings goal</span><span class="pct" id="goalP">0%</span></div>
-    <div class="bar"><div class="fill" id="goalF"></div></div>
-    <div class="sub" style="margin:10px 0 0" id="goalS">—</div>
+    <h3>Next bill</h3>
+    <p style="color:var(--muted)">Pay the next due commitment from your reserved funds.</p>
+    <button class="mv" id="billPayNow">Pay now</button>
   </div>
-  </div></div>
 </section>
 
 <!-- WEWE -->
@@ -181,9 +295,9 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
   </div>
   <div class="chips" id="chips">
     <button class="chip" data-q="Can I afford $60 this week?">Can I afford something?</button>
-    <button class="chip" data-q="What is my weekly spending limit?">Weekly limit</button>
-    <button class="chip" data-q="How am I doing on my savings goal?">My savings goal</button>
-    <button class="chip" data-q="What bills are coming up?">Upcoming bills</button>
+    <button class="chip" data-q="Set weekly limit">Set weekly limit</button>
+    <button class="chip" data-q="Plan my savings">Plan my savings</button>
+    <button class="chip" data-q="Analyse my bills">Analyse my bills</button>
     <button class="chip" data-q="Split my salary">Split my salary</button>
   </div>
   </div><div class="col"><h3>Smart features</h3>
@@ -207,6 +321,23 @@ body{background:radial-gradient(900px 520px at 85% -10%,rgba(0,230,118,.2),trans
   </div><div class="col">
     <div class="card"><div class="goalhead"><span>Spent this month</span><span class="pct" id="rTot">$0</span></div><div id="rList"><div class="sub">No spending yet.</div></div></div>
   </div></div>
+  <div class="card" style="margin-top:12px">
+    <div class="goalhead"><span>Where your money is</span><span class="pct" id="planTotal">$0</span></div>
+    <div class="seg" id="seg"></div><div id="legend"></div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <h3>Weekly spending limit</h3>
+    <p style="color:var(--muted)">Set how much you want to spend each week.</p>
+    <label for="weeklyLimitInput">Limit (USD)</label>
+    <input class="fld" id="weeklyLimitInput" type="number" min="0.01" step="0.01" placeholder="e.g. 150">
+    <button class="mv" id="saveWeeklyLimit" style="margin-top:12px">Save weekly limit</button>
+    <p id="weeklyLimitMessage" role="status"></p>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="goalhead"><span id="goalT">Savings goal</span><span class="pct" id="goalP">0%</span></div>
+    <div class="bar"><div class="fill" id="goalF"></div></div>
+    <div class="sub" style="margin:10px 0 0" id="goalS">—</div>
+  </div>
 </section>
 </div>
 
@@ -269,10 +400,24 @@ const botSVG=s=>`<svg class="bot" width="${s}" height="${s}" viewBox="0 0 100 10
 document.querySelectorAll('[data-bot]').forEach(e=>e.innerHTML=botSVG(+e.dataset.bot));
 
 const $=s=>document.querySelector(s);
-const API='https://webanki.vercel.app', DEMO={email:'demo@webanki.app',password:'Demo12345'};
-let TOKEN=null,D=null,BAL=0;
+
+const API='http://127.0.0.1:8000';
+let TOKEN=sessionStorage.getItem('webanki-token'),D=null,BAL=0;
 let chatHistory = [];
+let authMode='login';
+let billInsightsLoading=false;
 const usd=c=>'$'+(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2});
+
+function escapeHTML(value){
+  return String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
 const fd=d=>d?new Date(d+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
 const day=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2600)}
@@ -284,21 +429,87 @@ async function api(path,opt={}){
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:'Request failed');return j}
 const post=(p,b)=>api(p,{method:'POST',body:b?JSON.stringify(b):undefined});
-async function login(){
-  try{TOKEN=(await post('/auth/login',DEMO)).token}
-  catch(e){ // first run or cold-start DB reset: recreate the demo user and seed buckets
-    try{
-      TOKEN=(await post('/auth/register',{name:'Alex',...DEMO,balance:100000,salary:320000,weekly_limit:20000,savings_pct:20})).token;
-      await post('/me/buckets',{kind:'rent',name:'Rent',amount_due:95000,due_date:day(5)});
-      await post('/me/buckets',{kind:'bills',name:'Bills',amount_due:34000,due_date:day(2)});
-      await post('/me/buckets',{kind:'tuition',name:'Tuition',amount_due:120000,due_date:day(90)});
-      await post('/me/buckets',{kind:'savings',name:'New laptop',amount_due:150000});
-    }catch(e2){throw new Error('Backend unreachable: '+e2.message)}
-  }}
+
+function setAuthMode(mode) {
+  authMode = mode;
+
+  const registering = mode === 'register';
+
+  document.getElementById('nameField').style.display =
+    registering ? 'block' : 'none';
+
+  document.getElementById('salaryField').style.display =
+    registering ? 'block' : 'none';
+
+  document.getElementById('authName').required = registering;
+  document.getElementById('authSalary').required = registering;
+
+  document.getElementById('authPassword').autocomplete =
+    registering ? 'new-password' : 'current-password';
+
+  document.getElementById('authSubmit').textContent =
+    registering ? 'Create account' : 'Login';
+
+  document.getElementById('authError').textContent = '';
+}
+
+document.getElementById('showLogin').onclick = () => setAuthMode('login');
+document.getElementById('showRegister').onclick = () => setAuthMode('register');
+
+document.getElementById('authForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const errorBox = document.getElementById('authError');
+  const submitButton = document.getElementById('authSubmit');
+
+  errorBox.textContent = '';
+  submitButton.disabled = true;
+
+  try {
+    const email = document.getElementById('authEmail').value.trim().toLowerCase();
+    const password = document.getElementById('authPassword').value;
+
+    let result;
+
+    if (authMode === 'register') {
+      const name = document.getElementById('authName').value.trim();
+      const salaryDollars = Number(document.getElementById('authSalary').value);
+
+      if (!name || !Number.isFinite(salaryDollars) || salaryDollars <= 0) {
+        throw new Error('Enter your name and a valid monthly salary.');
+      }
+
+      result = await post('/auth/register', {
+        name,
+        email,
+        password,
+        salary: Math.round(salaryDollars * 100)
+      });
+    } else {
+      result = await post('/auth/login', { email, password });
+    }
+
+    if (!result.token) {
+      throw new Error('Authentication succeeded without a token.');
+    }
+
+TOKEN = result.token;
+sessionStorage.setItem('webanki-token', TOKEN);
+
+await load();
+
+document.body.classList.add('authenticated');
+document.getElementById('authScreen').style.display = 'none';
+  } catch (error) {
+    errorBox.textContent = error.message || 'Something went wrong.';
+  } finally {
+    submitButton.disabled = false;
+  }
+});
 
 /* ===== Render ===== */
 const COL=['#0A7A4B','#12B76A','#00E676','#5CF2A8','#B8FFD9'];
-function setCard(id,cents,sub,pct){const e=$('#'+id);e.querySelector('.amt').dataset.n=cents/100;e.querySelector('.sub').textContent=sub;e.querySelector('.fill').dataset.w=Math.max(0,Math.min(100,pct))}
+function setCard(id,cents,sub,pct){const e=$('#'+id);if(!e)return;e.querySelector('.amt').dataset.n=cents/100;e.querySelector('.sub').textContent=sub;e.querySelector('.fill').dataset.w=Math.max(0,Math.min(100,pct))}
 function runSplit(){document.querySelectorAll('#seg i').forEach(s=>{s.style.width='0';requestAnimationFrame(()=>requestAnimationFrame(()=>s.style.width=s.dataset.w+'%'))})}
 function playHome(){
   count($('#bal'),BAL,1600);
@@ -310,7 +521,9 @@ async function load(){
   D=await api('/me/dashboard');
   BAL=D.balance/100;
   $('#nm').textContent=D.name;$('#sal').textContent=usd(D.salary);$('#tip').textContent=D.wewe_tip;
-  const t=new Date(),nx=new Date(t.getFullYear(),t.getMonth()+1,1);$('#pay').textContent='Payday in '+Math.ceil((nx-t)/864e5)+' days';
+  $('#homeSafeToSpend').textContent=usd(D.safe_to_spend);
+  $('#homeSafeToSpendMessage').textContent=D.safe_to_spend>0?'Available after your commitments.':'Your commitments currently use your available funds.';
+  $('#pay').textContent = 'Monthly salary';
   const by=k=>D.buckets.filter(b=>b.kind===k);
   const agg=k=>{const l=by(k);return{due:l.reduce((s,b)=>s+b.amount_due,0),saved:l.reduce((s,b)=>s+b.saved,0),date:l.map(b=>b.due_date).filter(Boolean).sort()[0]}};
   for(const [id,k] of [['k-bills','bills'],['k-rent','rent'],['k-tuition','tuition']]){const a=agg(k);setCard(id,a.due,(k==='tuition'?'Next term ':'Due ')+fd(a.date),a.due?a.saved/a.due*100:0)}
@@ -324,17 +537,83 @@ async function load(){
   $('#legend').innerHTML=parts.map((p,i)=>`<div class="lg"><span><span class="dot" style="background:${COL[i]}"></span>${p[0]}</span><b>${usd(p[1])}</b></div>`).join('');
   $('#hello').textContent=`Hi ${D.name}! You can safely spend ${usd(D.safe_to_spend)} this month.`;
   $('#mv').textContent=nextDue()?('Pay '+nextDue().name):'All paid';
+  $('#billPayNow').textContent=nextDue()?('Pay '+nextDue().name):'All paid';
   playHome();
+  loadBillInsights().catch(console.error);
 }
+
+
+async function loadBillInsights(){
+  const neededEl = $('#billsStillNeeded');
+  const safeEl = $('#billsSafeToSpend');
+  const coverageEl = $('#billsCoverage');
+  const reminderEl = $('#billReminderList');
+  const statusEl = $('#billInsightsStatus');
+
+  try{
+    const [reminderData, billData] = await Promise.all([
+      api('/me/reminders'),
+      api('/me/analyse-bills')
+    ]);
+
+    const reminders = reminderData.reminders || [];
+
+    neededEl.textContent = usd(billData.total_still_needed ?? 0);
+    safeEl.textContent = usd(billData.safe_to_spend ?? 0);
+
+    coverageEl.textContent = billData.can_cover_all === true
+      ? 'Your current funds can cover all listed bills.'
+      : billData.can_cover_all === false
+        ? 'Your current funds may not cover all listed bills.'
+        : 'Bill affordability status is unavailable.';
+
+    reminderEl.innerHTML = reminders.length
+      ? reminders.map(item => {
+          const title = item.name || item.title || item.message || 'Bill reminder';
+          const daysLeft = item.days_left;
+          const amount = item.still_needed;
+          const dueText = daysLeft == null
+            ? ''
+            : daysLeft < 0
+              ? 'Overdue'
+              : daysLeft === 0
+                ? 'Due today'
+                : `Due in ${daysLeft} days`;
+
+          return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+            <b>${escapeHTML(String(title))}</b>
+            ${dueText ? `<div class="sub">${escapeHTML(dueText)}</div>` : ''}
+            ${amount != null ? `<div class="sub">${usd(Number(amount))}</div>` : ''}
+          </div>`;
+        }).join('')
+      : '<div class="sub">No upcoming reminders found.</div>';
+
+    statusEl.textContent = `Updated ${new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})}`;
+    $('#homeBillsPreview').textContent = billData.total_still_needed != null
+      ? usd(billData.total_still_needed)
+      : '—';
+    $('#homeRemindersPreview').textContent = reminders.length
+      ? `${reminders.length} reminder${reminders.length === 1 ? '' : 's'} need attention.`
+      : 'No bills due within the next 3 days.';
+    return {reminders, billData};
+  }catch(e){
+    statusEl.textContent = 'Could not refresh bill insights. Please try again.';
+    console.error('Bill insights could not load:', e);
+    throw e;
+  }
+}
+
+
 const nextDue=()=>D&&D.buckets.filter(b=>b.kind!=='savings'&&b.due_date).sort((a,b)=>a.due_date<b.due_date?-1:1)[0];
 
 /* ===== Tabs + actions ===== */
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===id));
-  $('#ask').classList.toggle('on',id==='wewe');window.scrollTo({top:0});if(id==='home'&&D)playHome();if(id==='spend')loadReport().catch(()=>{});
+  $('#ask').classList.toggle('on',id==='wewe');window.scrollTo({top:0});if(id==='home'&&D)playHome();if(id==='bills'&&D)loadBillInsights().catch(()=>{});if(id==='spend')loadReport().catch(()=>{});
 }
 $('#nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b)show(b.dataset.s)});
+$('#openBills').onclick=()=>show('bills');
 const themeButtons=document.querySelectorAll('[data-theme-choice]');
 function setTheme(theme){
   if(theme==='system'){
@@ -354,32 +633,93 @@ setTheme(localStorage.getItem('webanki-theme')||'system');
 themeButtons.forEach(button=>button.onclick=()=>setTheme(button.dataset.themeChoice));
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>toast(b.dataset.t));
 document.querySelectorAll('.tg').forEach(t=>t.onclick=()=>t.classList.toggle('on'));
-$('#mv').onclick=async()=>{const b=nextDue();if(!b)return;try{const r=await post(`/me/buckets/${b.id}/pay`);toast(`Paid ${r.paid}: ${usd(r.amount)} ✓`);await load()}catch(e){toast(e.message)}};
+const payNextBill=async()=>{const b=nextDue();if(!b)return;try{const r=await post(`/me/buckets/${b.id}/pay`);toast(`Paid ${r.paid}: ${usd(r.amount)} ✓`);await load()}catch(e){toast(e.message)}};
+$('#mv').onclick=payNextBill;
+$('#billPayNow').onclick=payNextBill;
 $('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary ${usd(r.salary_added)} added and split ✓`);await load()}catch(e){toast(e.message)}};
+
+$('#saveWeeklyLimit').onclick = async () => {
+  const input = $('#weeklyLimitInput');
+  const message = $('#weeklyLimitMessage');
+  const dollars = Number(input.value);
+
+  if (!Number.isFinite(dollars) || dollars <= 0) {
+    message.textContent = 'Enter a weekly limit greater than $0.';
+    return;
+  }
+
+  try {
+    await api('/me/weekly-limit', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        weekly_limit: Math.round(dollars * 100)
+      })
+    });
+
+    message.textContent = 'Weekly limit saved successfully!';
+    toast('Weekly limit updated ✓');
+    await load();
+  } catch (e) {
+    message.textContent = e.message;
+  }
+};
+
+$('#bucketForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const message = $('#bucketMessage');
+  const button = $('#createBucketBtn');
+  const dollars = Number($('#bucketAmount').value);
+  const name = $('#bucketName').value.trim();
+  const kind = $('#bucketKind').value;
+  const dueDate = $('#bucketDate').value;
+
+  if (!name || !Number.isFinite(dollars) || dollars <= 0) {
+    message.textContent = 'Enter a bucket name and a target amount above $0.';
+    return;
+  }
+
+  button.disabled = true;
+  message.textContent = 'Creating bucket…';
+
+  try {
+    const payload = {
+      kind,
+      name,
+      amount_due: Math.round(dollars * 100),
+      due_date: dueDate || null
+    };
+
+    await post('/me/buckets', payload);
+
+    message.textContent = 'Bucket created successfully!';
+    toast('Budget bucket created ✓');
+    $('#bucketForm').reset();
+
+    await load();
+  } catch (error) {
+    message.textContent = error.message || 'Could not create bucket.';
+  } finally {
+    button.disabled = false;
+  }
+});
 
 /* ===== WEWE chat ===== */
 
-async function askWewe(text){
-  const q = text.toLowerCase();
 
-  // Only intercept explicit action commands (payday/split salary) — everything
-  // else goes to the LLM so it has full context and can answer follow-ups.
-  if(/\b(split my salary|run payday|add my salary)\b/.test(q)){
-    const r = await post('/me/payday');
-    await load();
-    return `Added ${usd(r.salary_added)}. I set aside ` + r.plan.map(p => `${usd(p.set_aside)} for ${p.bucket}`).join(', ') + '.';
-  }
 
-  // All other questions — including bills, savings, affordability, spending
-  // reports, weekly limits, and follow-ups — go to the backend LLM endpoint.
-  // Pass the full conversation history so WEWE can maintain context.
+async function askWewe(text) {
   const result = await post('/me/wewe/chat', {
     message: text,
     history: chatHistory.slice(0, -1)
   });
 
+  console.log('WEWE response source:', result.source);
+
   return result.reply;
 }
+
+
 const msgs=$('#msgs');
 function bubble(cls,html=''){const d=document.createElement('div');d.className='m '+cls;d.innerHTML=html;msgs.appendChild(d);d.scrollIntoView({block:'center',behavior:'smooth'});return d}
 async function send(text){
@@ -397,27 +737,74 @@ async function send(text){
 $('#go').onclick=()=>send($('#inp').value);
 $('#inp').addEventListener('keydown',e=>{if(e.key==='Enter')send(e.target.value)});
 $('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip');if(c)send(c.dataset.q)});
-$('#rep').onclick=()=>{show('wewe');send('Show my spending report')};
+$('#rep').onclick = () => show('spend');
+
+$('#refreshBillInsights').onclick = async () => {
+  const button = $('#refreshBillInsights');
+
+  if (billInsightsLoading) return;
+
+  billInsightsLoading = true;
+  button.disabled = true;
+  button.textContent = 'Refreshing…';
+
+  try {
+    await loadBillInsights();
+  } finally {
+    billInsightsLoading = false;
+    button.disabled = false;
+    button.textContent = 'Refresh';
+  }
+};
 async function loadReport(){
   const r=await api('/me/report'),k=Object.entries(r.by_category),nm={weekly:'Daily life'};
   $('#rTot').textContent=usd(r.total);
   $('#rList').innerHTML=k.length?k.map(([c,v])=>`<div class="lg"><span>${nm[c]||c[0].toUpperCase()+c.slice(1)}</span><b>${usd(v)}</b></div>`).join(''):'<div class="sub">No spending yet.</div>';
 }
-$('#exGo').onclick=async()=>{const v=parseFloat($('#exA').value);if(!(v>0))return toast('Enter an amount first');
-  try{const r=await post('/me/expenses',{amount:Math.round(v*100),category:$('#exC').value,note:$('#exN').value});
+
+$('#exGo').onclick=async()=>{
+  const v=parseFloat($('#exA').value);
+  if(!(v>0))return toast('Enter an amount first');
+
+  try{
+    const r=await post('/me/expenses',{
+      amount:Math.round(v*100),
+      category:$('#exC').value,
+      note:$('#exN').value,
+      round_up:document.querySelector('.tg[aria-label="Round-up savings"]').classList.contains('on')
+    });
+
     toast(r.round_up_saved?`Added. WEWE saved ${usd(r.round_up_saved)} from the round-up ✓`:'Expense added ✓');
     if(r.warning)setTimeout(()=>toast(r.warning),2800);
-    $('#exA').value='';$('#exN').value='';await load();await loadReport()}catch(e){toast(e.message)}};
-(async()=>{
-  try{await login();await load()}
-  catch(e){
-    // Show a persistent error banner instead of a disappearing toast
-    const banner=document.createElement('div');
-    banner.style.cssText='position:fixed;inset:0;z-index:99;background:rgba(3,23,15,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#8CF3BE;font-size:16px;padding:24px;text-align:center';
-    banner.innerHTML=`<div style="font-size:40px">⚠️</div><div><b>Can't reach the backend</b><br><span style="font-size:14px;color:#4C6E5F">${e.message}</span></div><button onclick="location.reload()" style="background:linear-gradient(90deg,#00E676,#5CF2A8);color:#03170F;border:0;padding:12px 28px;border-radius:99px;font-size:16px;font-weight:700;cursor:pointer">Retry</button>`;
-    document.body.appendChild(banner);
+    $('#exA').value='';
+    $('#exN').value='';
+    await load();
+    await loadReport();
+  }catch(e){
+    toast(e.message);
   }
+};
+
+
+(async () => {
+  setAuthMode('login');
+
+  if (TOKEN) {
+    try {
+      await load();
+      document.body.classList.add('authenticated');
+      document.getElementById('authScreen').style.display = 'none';
+      return;
+    } catch (error) {
+      TOKEN = null;
+      sessionStorage.removeItem('webanki-token');
+    }
+  }
+
+  document.body.classList.remove('authenticated');
+  document.getElementById('authScreen').style.display = 'block';
 })();
+
 
 /* ===== Modals ===== */
 function openModal(id){const m=$('#'+id);m.style.display='flex'}
