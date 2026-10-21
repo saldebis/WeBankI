@@ -129,7 +129,7 @@ All `/me/...` endpoints require a Bearer token.
 | Name | Role |
 |---|---|
 | Salma | Backend development and financial logic |
-| _[Teammate's name]_ | Frontend development |
+|  Fathima | Frontend development |
 
 ## Disclaimer
 
