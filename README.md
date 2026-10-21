@@ -4,7 +4,7 @@
 
 WEBANKI is an AI-assisted personal finance prototype built for the Shenzhen FinTech Competition. It sets money aside for rent, bills, tuition and savings *before* you spend it, then tells you how much is actually free, with help from **WEWE**, a friendly green robot assistant.
 
-🔗 **[Live demo](https://frontend-lake-xi-76.vercel.app)** · 💻 **[GitHub](https://github.com/saldebis/WeBankI)** · 📊 **[Slides](https://drive.google.com/file/d/1VnlIfgagM38XqRZpJdzIg5WE7HckYYbh/view?usp=sharing)** · 🎥 **Demo video:** _coming soon_
+🔗 **[Live demo](https://frontend-lake-xi-76.vercel.app)** · 💻 **[GitHub](https://github.com/saldebis/WeBankI)** · 📊 **[Slides](https://drive.google.com/file/d/1VnlIfgagM38XqRZpJdzIg5WE7HckYYbh/view?usp=sharing)** · 🎥 **Demo video:** https://drive.google.com/file/d/1PVrVcCOYVzBgbY7oTEPJ4SImcIxVh_Rk/view?usp=sharing
 
 > ⚠️ **Prototype notice:** WEBANKI uses simulated data, does not connect to real bank accounts, and never moves real money. Please don't enter real financial information.
 
