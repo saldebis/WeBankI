@@ -2,7 +2,7 @@
 
 > **Your balance shows what you have. WEBANKI shows what you can safely spend.**
 
-🔗 [Live demo](https://webanki.vercel.app) · 🎥 [Demo video](https://drive.google.com/file/d/1PVrVcCOYVzBgbY7oTEPJ4SImcIxVh_Rk/view?usp=sharing) · 🔒 [Security report](SECURITY_REPORT.md) · 📊 [Slides](https://drive.google.com/file/d/1VnlIfgagM38XqRZpJdzIg5WE7HckYYbh/view?usp=sharing) · 💻 [GitHub](https://github.com/saldebis/WeBankI)
+🔗 [Live demo](https://frontend-lake-xi-76.vercel.app/) · 🎥 [Demo video](https://drive.google.com/file/d/1PVrVcCOYVzBgbY7oTEPJ4SImcIxVh_Rk/view?usp=sharing) · 🔒 [Security report](SECURITY_REPORT.md) · 📊 [Slides](https://drive.google.com/file/d/1VnlIfgagM38XqRZpJdzIg5WE7HckYYbh/view?usp=sharing) · 💻 [GitHub](https://github.com/saldebis/WeBankI)
 
 ---
 
