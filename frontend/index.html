@@ -236,10 +236,10 @@ body.authenticated #authScreen {
 <section class="screen" id="bills">
   <div class="hero" style="padding-bottom:10px"><h2>Bills &amp; Budgets</h2><p>Stay ahead of upcoming commitments.</p></div>
   <div class="grid">
-    <div class="card" id="k-bills"><div class="k">Bills</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
-    <div class="card" id="k-rent"><div class="k">Rent</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
-    <div class="card" id="k-tuition"><div class="k">Tuition</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
-    <div class="card" id="k-week"><div class="k">Daily life</div><div class="amt">$0</div><div class="sub">Left this week</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-bills" style="cursor:pointer" title="Tap to edit Bills amount" onclick="openBudgetEdit('bills')"><div class="k">Bills ✏️</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-rent" style="cursor:pointer" title="Tap to edit Rent amount" onclick="openBudgetEdit('rent')"><div class="k">Rent ✏️</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-tuition" style="cursor:pointer" title="Tap to edit Tuition amount" onclick="openBudgetEdit('tuition')"><div class="k">Tuition ✏️</div><div class="amt">$0</div><div class="sub">—</div><div class="bar"><div class="fill"></div></div></div>
+    <div class="card" id="k-week" style="cursor:pointer" title="Tap to edit weekly budget" onclick="openBudgetEdit('weekly')"><div class="k">Daily life ✏️</div><div class="amt">$0</div><div class="sub">Left this week</div><div class="bar"><div class="fill"></div></div></div>
   </div>
 
   <div class="card" id="billInsights" style="margin-bottom:12px">
@@ -342,6 +342,25 @@ body.authenticated #authScreen {
     <div class="sub" style="margin:10px 0 0" id="goalS">—</div>
   </div>
 </section>
+</div>
+
+<!-- BUDGET EDIT MODAL -->
+<div id="modalBudgetEdit" style="display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:24px;width:min(360px,90vw)">
+    <div id="budgetEditTitle" style="font-size:18px;font-weight:700;margin-bottom:6px">Edit amount</div>
+    <div id="budgetEditDesc" style="font-size:14px;color:var(--muted);margin-bottom:16px"></div>
+    <div class="k">Amount ($)</div>
+    <input class="fld" id="budgetEditAmt" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+    <div id="budgetEditDateWrap" style="margin-top:12px">
+      <div class="k">Due date (optional)</div>
+      <input class="fld" id="budgetEditDate" type="date">
+    </div>
+    <p id="budgetEditError" role="alert" style="color:#D94848;font-size:14px;margin:8px 0 0"></p>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="mv" id="budgetEditSave" style="flex:1;padding:13px">Save</button>
+      <button class="mv" onclick="closeModal('modalBudgetEdit')" style="flex:1;padding:13px;background:var(--line);color:var(--text)">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- SEND MODAL -->
@@ -654,6 +673,80 @@ const payNextBill=async()=>{const b=nextDue();if(!b)return;try{const r=await pos
 $('#mv').onclick=payNextBill;
 $('#billPayNow').onclick=payNextBill;
 $('#split').onclick=async()=>{try{const r=await post('/me/payday');toast(`Salary ${usd(r.salary_added)} added and split ✓`);await load()}catch(e){toast(e.message)}};
+
+/* ===== Budget card edit modal ===== */
+let _budgetEditKind = null;
+
+const BUDGET_META = {
+  bills:   { title: 'Edit Bills amount',       desc: 'Set the total amount you reserve for bills each month.', hasDate: true  },
+  rent:    { title: 'Edit Rent amount',         desc: 'Set the monthly rent you reserve.',                     hasDate: true  },
+  tuition: { title: 'Edit Tuition amount',      desc: 'Set the tuition amount you reserve each term.',          hasDate: true  },
+  weekly:  { title: 'Edit Daily Life budget',   desc: 'Set your weekly spending limit for daily expenses.',     hasDate: false },
+};
+
+function openBudgetEdit(kind) {
+  _budgetEditKind = kind;
+  const meta = BUDGET_META[kind] || { title: 'Edit amount', desc: '', hasDate: false };
+  $('#budgetEditTitle').textContent = meta.title;
+  $('#budgetEditDesc').textContent  = meta.desc;
+  $('#budgetEditDateWrap').style.display = meta.hasDate ? 'block' : 'none';
+  $('#budgetEditError').textContent = '';
+
+  // Pre-fill the current saved value
+  if (D) {
+    if (kind === 'weekly') {
+      const limit = D.weekly && D.weekly.limit ? D.weekly.limit / 100 : '';
+      $('#budgetEditAmt').value = limit;
+      $('#budgetEditDate').value = '';
+    } else {
+      const buckets = D.buckets.filter(b => b.kind === kind);
+      const total = buckets.reduce((s, b) => s + b.amount_due, 0);
+      const firstDate = buckets.map(b => b.due_date).filter(Boolean).sort()[0] || '';
+      $('#budgetEditAmt').value = total ? (total / 100) : '';
+      $('#budgetEditDate').value = firstDate;
+    }
+  } else {
+    $('#budgetEditAmt').value = '';
+    $('#budgetEditDate').value = '';
+  }
+
+  openModal('modalBudgetEdit');
+  setTimeout(() => $('#budgetEditAmt').focus(), 80);
+}
+
+$('#budgetEditSave').onclick = async () => {
+  const kind = _budgetEditKind;
+  if (!kind) return;
+
+  const dollars = Number($('#budgetEditAmt').value);
+  const dueDate = $('#budgetEditDate').value || null;
+  const errEl = $('#budgetEditError');
+  errEl.textContent = '';
+
+  if (!Number.isFinite(dollars) || dollars < 0) {
+    errEl.textContent = 'Enter a valid amount (0 or more).';
+    return;
+  }
+
+  const btn = $('#budgetEditSave');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    await api(`/me/budget/${kind}`, {
+      method: 'PUT',
+      body: JSON.stringify({ kind, amount_due: Math.round(dollars * 100), due_date: dueDate })
+    });
+    closeModal('modalBudgetEdit');
+    toast(`${BUDGET_META[kind]?.title?.replace('Edit ', '') || kind} saved ✓`);
+    await load();
+  } catch (e) {
+    errEl.textContent = e.message || 'Could not save. Please try again.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  }
+};
 
 $('#saveWeeklyLimit').onclick = async () => {
   const input = $('#weeklyLimitInput');

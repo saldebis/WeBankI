@@ -76,6 +76,16 @@ class BucketIn(BaseModel):
     amount_due: int = Field(0, ge=0, description="cents (savings: goal amount)")
     due_date: Optional[str] = Field(None, description="YYYY-MM-DD; moves forward a month when paid")
 
+class BucketUpdateIn(BaseModel):
+    name: Optional[str] = None
+    amount_due: Optional[int] = Field(None, ge=0, description="cents")
+    due_date: Optional[str] = Field(None, description="YYYY-MM-DD or null to clear")
+
+class BucketUpsertIn(BaseModel):
+    kind: Literal["bills", "rent", "tuition", "savings", "weekly"]
+    amount_due: int = Field(..., ge=0, description="cents")
+    due_date: Optional[str] = Field(None, description="YYYY-MM-DD")
+
 class ExpenseIn(BaseModel):
     amount: int = Field(..., gt=0, description="cents")
     category: str
@@ -144,12 +154,64 @@ def login(b: LoginIn):
     return {"token": make_token(u["id"])}
 
 # ---------- app routes (all need a token) ----------
+@app.get("/me/buckets")
+def list_buckets(uid: int = Depends(current_uid)):
+    """List all buckets for the current user."""
+    with db() as c:
+        return {"buckets": buckets_of(c, uid)}
+
 @app.post("/me/buckets")
 def add_bucket(b: BucketIn, uid: int = Depends(current_uid)):
     with db() as c:
         cur = c.execute("INSERT INTO buckets(user_id,kind,name,amount_due,due_date) VALUES(?,?,?,?,?)",
                         (uid, b.kind, b.name, b.amount_due, b.due_date))
         return {"id": cur.lastrowid}
+
+@app.patch("/me/buckets/{bid}")
+def update_bucket(bid: int, b: BucketUpdateIn, uid: int = Depends(current_uid)):
+    """Update an existing bucket's name, amount_due, or due_date."""
+    with db() as c:
+        row = c.execute("SELECT * FROM buckets WHERE id=? AND user_id=?", (bid, uid)).fetchone()
+        if not row:
+            raise HTTPException(404, "Bucket not found")
+        name = b.name if b.name is not None else row["name"]
+        amount_due = b.amount_due if b.amount_due is not None else row["amount_due"]
+        due_date = b.due_date if b.due_date is not None else row["due_date"]
+        c.execute("UPDATE buckets SET name=?, amount_due=?, due_date=? WHERE id=?",
+                  (name, amount_due, due_date, bid))
+        return {"id": bid, "name": name, "amount_due": amount_due, "due_date": due_date}
+
+@app.put("/me/budget/{kind}")
+def upsert_budget(kind: str, b: BucketUpsertIn, uid: int = Depends(current_uid)):
+    """Upsert the primary bucket for a given kind (bills/rent/tuition/savings).
+    For 'weekly', updates the user's weekly_limit instead.
+    Creates the bucket if none exists for that kind; updates the first one if it does."""
+    if kind == "weekly":
+        with db() as c:
+            c.execute("UPDATE users SET weekly_limit=? WHERE id=?", (b.amount_due, uid))
+        return {"kind": "weekly", "amount_due": b.amount_due}
+    allowed = ("bills", "rent", "tuition", "savings")
+    if kind not in allowed:
+        raise HTTPException(400, f"kind must be one of {allowed} or 'weekly'")
+    with db() as c:
+        existing = c.execute(
+            "SELECT * FROM buckets WHERE user_id=? AND kind=? ORDER BY id LIMIT 1",
+            (uid, kind)
+        ).fetchone()
+        name_map = {"bills": "Bills", "rent": "Rent", "tuition": "Tuition", "savings": "Savings"}
+        name = existing["name"] if existing else name_map.get(kind, kind.capitalize())
+        if existing:
+            c.execute("UPDATE buckets SET amount_due=?, due_date=? WHERE id=?",
+                      (b.amount_due, b.due_date if b.due_date else existing["due_date"], existing["id"]))
+            return {"id": existing["id"], "kind": kind, "amount_due": b.amount_due,
+                    "due_date": b.due_date if b.due_date else existing["due_date"], "created": False}
+        else:
+            cur = c.execute(
+                "INSERT INTO buckets(user_id,kind,name,amount_due,due_date) VALUES(?,?,?,?,?)",
+                (uid, kind, name, b.amount_due, b.due_date)
+            )
+            return {"id": cur.lastrowid, "kind": kind, "amount_due": b.amount_due,
+                    "due_date": b.due_date, "created": True}
 
 @app.post("/me/payday")
 def payday(uid: int = Depends(current_uid)):
